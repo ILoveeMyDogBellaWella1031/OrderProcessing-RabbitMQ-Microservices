@@ -1,0 +1,14 @@
+# Simplified Dockerfile for pre-built application
+# This Dockerfile assumes the application is already built and published to ./publish directory
+# Build locally first with: dotnet publish -c Release -o ./publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER root
+WORKDIR /app
+EXPOSE 8080
+
+FROM base AS final
+WORKDIR /app
+# Copy the already-published application from the publish folder
+COPY ./publish .
+ENTRYPOINT ["dotnet", "OrderFlow.Core.dll"]

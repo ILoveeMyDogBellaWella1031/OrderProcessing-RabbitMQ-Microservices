@@ -1,0 +1,41 @@
+# docker-compose.dev.yml
+# Development configuration - RabbitMQ only
+# 
+# This file runs ONLY RabbitMQ for local development.
+# The application runs directly from Visual Studio for better debugging experience.
+#
+# Usage:
+#   Start:  docker-compose -f docker-compose.dev.yml up -d
+#   Stop:   docker-compose -f docker-compose.dev.yml down
+#   Logs:   docker-compose -f docker-compose.dev.yml logs -f rabbitmq
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management                # Use RabbitMQ image with management UI
+    container_name: orderflow-rabbitmq-dev      # Name the container for easy reference
+    hostname: rabbitmq-dev                      # Set the hostname for the container
+    ports:
+      - "5672:5672"   # AMQP port for messaging (used by your app)
+      - "15672:15672" # Management UI port (for browser access)
+    environment:
+      RABBITMQ_DEFAULT_USER: admin              # Set default RabbitMQ username
+      RABBITMQ_DEFAULT_PASS: admin123           # Set default RabbitMQ password
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping        # Health check command to verify RabbitMQ is running
+      interval: 10s                             # Check every 10 seconds
+      timeout: 5s                               # Timeout for health check
+      retries: 5                                # Retry up to 5 times before marking unhealthy
+      start_period: 30s                         # Wait 30 seconds before performing the first health check
+    volumes:
+      - rabbitmq_dev_data:/var/lib/rabbitmq    # Persist RabbitMQ data
+    networks:
+      - orderflow-dev-network                   # Attach to custom Docker network
+
+networks:
+  orderflow-dev-network:
+    driver: bridge                              # Use bridge network driver for container communication
+    name: orderflow-dev-network                 # Explicitly name the network
+
+volumes:
+  rabbitmq_dev_data:
+    name: orderflow_rabbitmq_dev_data          # Name the volume for RabbitMQ data persistence

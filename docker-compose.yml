@@ -27,7 +27,8 @@ services:
   orderflow-core:
     build:
       context: .                                # Build context is the current directory
-      dockerfile: Dockerfile                    # Use the multi-stage production Dockerfile
+      # dockerfile: Dockerfile                    # Use the multi-stage production Dockerfile. Line commented out as Dockerfile.simple is used instead for development/testing.
+      dockerfile: Dockerfile.simple             # Use the simplified Dockerfile (requires pre-built app)
     container_name: orderflow-core              # Name the app container
     hostname: orderflow-core                    # Set the hostname for the app container
     ports:
