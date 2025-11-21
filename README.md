@@ -1,6 +1,28 @@
-﻿# OrderFlow.Core - Order Processing with RabbitMQ Pub/Sub
+﻿# OrderFlow - Event-Driven Order Processing with RabbitMQ Pub/Sub & .NET 8
 
 **Author:** Dariem Carlos Macias
+
+---
+
+<div align="center">
+
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.x-FF6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![C#](https://img.shields.io/badge/C%23-12.0-239120?logo=c-sharp&logoColor=white)](https://docs.microsoft.com/en-us/dotnet/csharp/)
+
+[![Architecture](https://img.shields.io/badge/Architecture-Event--Driven-blue)](https://docs.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven)
+[![Pattern](https://img.shields.io/badge/Pattern-Pub%2FSub-green)](https://www.rabbitmq.com/tutorials/tutorial-three-dotnet.html)
+[![Microservices](https://img.shields.io/badge/Microservices-Yes-brightgreen)](https://microservices.io/)
+[![Clean Architecture](https://img.shields.io/badge/Clean%20Architecture-Yes-brightgreen)](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+
+[![License](https://img.shields.io/badge/License-Demo-yellow)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![GitHub Stars](https://img.shields.io/github/stars/dariemcarlosdev/OrderProcessing-RabbitMQ-Microservices?style=social)](https://github.com/dariemcarlosdev/OrderProcessing-RabbitMQ-Microservices/stargazers)
+
+</div>
+
+---
 
 > *"The art of programming is the art of organizing complexity."* — **Edsger W. Dijkstra**
 
