@@ -1,0 +1,61 @@
+services:
+  # RabbitMQ message broker service with management UI.
+  # Provides messaging infrastructure for the application.
+  rabbitmq:
+    image: rabbitmq:3-management                # Use RabbitMQ image with management UI
+    container_name: orderflow-rabbitmq          # Name the container for easy reference
+    hostname: rabbitmq                        # Set the hostname for the container
+    ports:
+      - "5672:5672"   # AMQP port for messaging (used by your app)
+      - "15672:15672" # Management UI port (for browser access)
+    environment:
+      RABBITMQ_DEFAULT_USER: admin              # Set default RabbitMQ username
+      RABBITMQ_DEFAULT_PASS: admin123           # Set default RabbitMQ password
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping        # Health check command to verify RabbitMQ is running
+      interval: 10s                             # Check every 10 seconds
+      timeout: 5s                               # Timeout for health check
+      retries: 5                                # Retry up to 5 times before marking unhealthy
+      start_period: 30s                         # Wait 30 seconds before performing the first health check
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq        # Persist RabbitMQ data
+    networks:
+      - orderflow-network                       # Attach to custom Docker network for inter-container communication
+
+  # .NET 8 application service.
+  # Connects to RabbitMQ for messaging and exposes HTTP/HTTPS endpoints.
+  orderflow-core:
+    build:
+      context: .                                # Build context is the current directory
+      dockerfile: Dockerfile                    # Use the multi-stage production Dockerfile
+    container_name: orderflow-core              # Name the app container
+    hostname: orderflow-core                    # Set the hostname for the app container
+    ports:
+      - "8080:8080"                             # Expose app HTTP port 8080
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development      # Set ASP.NET Core environment to Development
+      - ASPNETCORE_HTTP_PORTS=8080              # Specify HTTP port for ASP.NET Core
+      - ASPNETCORE_URLS=http://+:8080          # Bind ASP.NET Core to specified ports
+      # RabbitMQ connection settings
+      - RabbitMq__HostName=rabbitmq             # Override RabbitMQ hostname to use service name (for Docker network)
+      - RabbitMq__Port=5672                     # Override RabbitMQ port
+      - RabbitMq__UserName=admin                # Override RabbitMQ username
+      - RabbitMq__Password=admin123             # Override RabbitMQ password
+      - RabbitMq__ExchangeName=order_exchange   # Override RabbitMQ exchange name
+      - RabbitMq__ExchangeType=topic            # Override RabbitMQ exchange type
+    depends_on:
+      rabbitmq:
+        condition: service_healthy              # Wait for RabbitMQ to be healthy before starting app
+    networks:
+      - orderflow-network                       # Attach to the same network as RabbitMQ
+    restart: unless-stopped                    # Restart the container unless it is explicitly stopped
+
+networks:
+  orderflow-network:
+    driver: bridge                              # Use bridge network driver for container communication
+    name: orderflow-network                     # Explicitly name the network
+
+volumes:
+  rabbitmq_data:
+    name: orderflow_rabbitmq_data              # Name the volume for RabbitMQ data persistence
+

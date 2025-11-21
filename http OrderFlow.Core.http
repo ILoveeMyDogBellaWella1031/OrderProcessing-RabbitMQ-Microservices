@@ -1,0 +1,108 @@
+@OrderFlow.Core_HostAddress = https://localhost:32771
+
+
+### 1. Create Order
+POST {{OrderFlow.Core_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "John Doe",
+  "productName": "Laptop",
+  "quantity": 2,
+  "totalAmount": 2499.99
+}
+
+###
+
+### 2. Create Another Order (for testing different scenarios)
+POST {{OrderFlow.Core_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Jane Smith",
+  "productName": "Wireless Mouse",
+  "quantity": 5,
+  "totalAmount": 149.95
+}
+
+###
+
+### 3. Verify Payment (replace with actual OrderId from Create Order response)
+# @name createOrderForPayment
+POST {{OrderFlow.Core_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Alice Johnson",
+  "productName": "Keyboard",
+  "quantity": 1,
+  "totalAmount": 89.99
+}
+
+###
+
+### 4. Verify Payment for Order
+POST {{OrderFlow.Core_HostAddress}}/api/orders/{{orderId}}/payment
+Content-Type: application/json
+
+# Replace {{orderId}} with actual GUID from Create Order response
+# Example: POST {{OrderFlow.Core_HostAddress}}/api/orders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/payment
+
+###
+
+### 5. Ship Order
+POST {{OrderFlow.Core_HostAddress}}/api/orders/{{orderId}}/ship
+Content-Type: application/json
+
+# Replace {{orderId}} with actual GUID from Create Order response
+# Example: POST {{OrderFlow.Core_HostAddress}}/api/orders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/ship
+
+###
+
+### 6. Deliver Order
+POST {{OrderFlow.Core_HostAddress}}/api/orders/{{orderId}}/deliver
+Content-Type: application/json
+
+# Replace {{orderId}} with actual GUID from Create Order response
+# Example: POST {{OrderFlow.Core_HostAddress}}/api/orders/a1b2c3d4-e5f6-7890-abcd-ef1234567890/deliver
+
+###
+
+### 7. Cancel Order
+DELETE {{OrderFlow.Core_HostAddress}}/api/orders/{{orderId}}
+Content-Type: application/json
+
+# Replace {{orderId}} with actual GUID from Create Order response
+# Example: DELETE {{OrderFlow.Core_HostAddress}}/api/orders/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+###
+
+### Complete Order Flow Test Sequence
+# Step 1: Create Order
+# @name orderFlowTest
+POST {{OrderFlow.Core_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Bob Wilson",
+  "productName": "Monitor",
+  "quantity": 1,
+  "totalAmount": 399.99
+}
+
+###
+
+# Step 2: Verify Payment (use OrderId from previous response)
+# POST {{OrderFlow.Core_HostAddress}}/api/orders/{OrderId}/payment
+
+###
+
+# Step 3: Ship Order (use same OrderId)
+# POST {{OrderFlow.Core_HostAddress}}/api/orders/{OrderId}/ship
+
+###
+
+# Step 4: Deliver Order (use same OrderId)
+# POST {{OrderFlow.Core_HostAddress}}/api/orders/{OrderId}/deliver
+
+###
