@@ -1,236 +1,138 @@
-# Docker Containerization Guide for OrderFlow.Core
+﻿# 🐳 Docker Containerization Guide for OrderFlow.Core
 
-> *"Containers are not just about packaging�they're about building systems that can scale, heal, and evolve."*
-
-## ?? Table of Contents
-
-1. [Overview](#overview)
-2. [Docker Compose Architecture](#docker-compose-architecture)
-3. [Service Definitions](#service-definitions)
-   - [RabbitMQ Service](#rabbitmq-service)
-   - [OrderFlow.Core Application Service](#orderflowcore-application-service)
-4. [Networking](#networking)
-5. [Volumes and Data Persistence](#volumes-and-data-persistence)
-6. [Service Orchestration](#service-orchestration)
-7. [Environment Variables](#environment-variables)
-8. [Health Checks](#health-checks)
-9. [Build Context and Dockerfile](#build-context-and-dockerfile)
-10. [Port Mappings](#port-mappings)
-11. [Dependency Management](#dependency-management)
-12. [Container Lifecycle](#container-lifecycle)
-13. [Best Practices Applied](#best-practices-applied)
-14. [Troubleshooting Container Issues](#troubleshooting-container-issues)
-15. [Advanced Scenarios](#advanced-scenarios)
+A simplified guide to containerizing and running the OrderFlow.Core application with Docker.
 
 ---
 
-## Overview
+## 📑 Table of Contents
 
-The `docker-compose.yml` file is the **orchestration blueprint** for the OrderFlow.Core distributed system. It defines:
-
-- **2 Services**: RabbitMQ message broker and OrderFlow.Core API
-- **1 Network**: Custom bridge network for inter-container communication
-- **1 Volume**: Persistent storage for RabbitMQ data
-- **Health Checks**: Ensuring RabbitMQ is ready before starting the application
-- **Environment Configuration**: All runtime settings via environment variables
-
-### Why Docker Compose?
-
-Docker Compose solves the complexity of multi-container applications by:
-- ? **Single Command Deployment** � `docker-compose up` starts the entire stack
-- ? **Declarative Configuration** � Infrastructure as code (YAML)
-- ? **Service Dependencies** � Ensures RabbitMQ starts before the app
-- ? **Network Isolation** � Services communicate securely on a private network
-- ? **Reproducibility** � Same environment on every machine
+1. [⚡ Quick Start](#-quick-start)
+2. [📋 Docker Compose Files Overview](#-docker-compose-files-overview)
+3. [💻 Development Setup (Recommended)](#-development-setup-recommended)
+4. [🚀 Full Stack Setup](#-full-stack-setup)
+5. [🔧 Understanding the Configuration](#-understanding-the-configuration)
+6. [⌨️ Common Commands](#️-common-commands)
+7. [🔍 Troubleshooting](#-troubleshooting)
 
 ---
 
-## Docker Compose Architecture
+## ⚡ Quick Start
 
-### High-Level Architecture Diagram
+### 💻 For Local Development (Recommended)
 
-```
-???????????????????????????????????????????????????????????????????
-?                     Docker Compose Stack                        ?
-?                                                                 ?
-?  ?????????????????????????????  ????????????????????????????  ?
-?  ?   RabbitMQ Service        ?  ?   OrderFlow.Core         ?  ?
-?  ?   (rabbitmq:3-mgmt)       ?  ?   (.NET 8 API)           ?  ?
-?  ?                           ?  ?                          ?  ?
-?  ?  - Port: 5672 (AMQP)      ????  - Port: 8080 (HTTP)     ?  ?
-?  ?  - Port: 15672 (Mgmt UI)  ?  ?  - Depends on RabbitMQ   ?  ?
-?  ?  - Health: rabbitmq-diag  ?  ?  - Environment: Dev      ?  ?
-?  ?  - Volume: rabbitmq_data  ?  ?  - Restart: unless-stop  ?  ?
-?  ?????????????????????????????  ????????????????????????????  ?
-?              ?                               ?                 ?
-?              ?????????????????????????????????                 ?
-?                          ?                                     ?
-?                ??????????????????????                          ?
-?                ?  orderflow-network ?                          ?
-?                ?  (bridge driver)   ?                          ?
-?                ??????????????????????                          ?
-?                                                                 ?
-?  ????????????????????????????????????????????????????????????  ?
-?  ?  Volume: orderflow_rabbitmq_data                         ?  ?
-?  ?  (Persistent storage for RabbitMQ)                       ?  ?
-?  ????????????????????????????????????????????????????????????  ?
-???????????????????????????????????????????????????????????????????
-         ?                                    ?
-         ?                                    ?
-   localhost:15672                      localhost:8080
-   (RabbitMQ UI)                        (Swagger API)
+Run only RabbitMQ in Docker, debug your app in Visual Studio:
+
+```bash
+# Start RabbitMQ
+docker-compose -f docker-compose.dev.yml up -d
+
+# Access RabbitMQ Management UI
+# 🌐 http://localhost:15672 (admin/admin123)
+
+# Run your app from Visual Studio (F5)
 ```
 
-### Component Relationships
+### 🚀 For Full Stack Testing
 
-```
-???????????????????????????????????????????????????????????????
-?                    Orchestration Flow                       ?
-???????????????????????????????????????????????????????????????
+Run both RabbitMQ and the application in Docker:
 
-1. docker-compose up
-   ?
-   ??> Create Network: orderflow-network (bridge)
-   ?
-   ??> Create Volume: orderflow_rabbitmq_data
-   ?
-   ??> Start Service: rabbitmq
-   ?   ?
-   ?   ??> Pull Image: rabbitmq:3-management
-   ?   ??> Create Container: orderflow-rabbitmq
-   ?   ??> Attach to Network: orderflow-network
-   ?   ??> Mount Volume: rabbitmq_data ? /var/lib/rabbitmq
-   ?   ??> Expose Ports: 5672, 15672
-   ?   ??> Set Environment: RABBITMQ_DEFAULT_USER, _PASS
-   ?   ??> Start Health Checks (every 10s)
-   ?       ?
-   ?       ??> Wait for "Healthy" status (max 5 retries)
-   ?
-   ??> Start Service: orderflow-core (after RabbitMQ healthy)
-       ?
-       ??> Build Image from Dockerfile
-       ??> Create Container: orderflow-core
-       ??> Attach to Network: orderflow-network
-       ??> Expose Port: 8080
-       ??> Set Environment: ASPNETCORE_*, RabbitMq__*
-       ??> Start Application
-           ?
-           ??> Connect to RabbitMQ via service name: rabbitmq:5672
+```bash
+# Start all services
+docker-compose up -d
+
+# 🌐 Access Application: http://localhost:8080
+# 📖 Access Swagger: http://localhost:8080/swagger
+# 🐰 Access RabbitMQ UI: http://localhost:15672
 ```
 
 ---
 
-## Service Definitions
+## 📋 Docker Compose Files Overview
 
-### RabbitMQ Service
+### Two Files, Two Purposes
 
-#### Complete Configuration
+| File | Purpose | What Runs | When to Use |
+|------|---------|-----------|-------------|
+| `docker-compose.dev.yml` | 💻 Development | RabbitMQ only | Debugging in Visual Studio |
+| `docker-compose.yml` | 🚀 Full Stack | RabbitMQ + App | Testing complete system |
+
+---
+
+## 💻 Development Setup (Recommended)
+
+### 🤔 Why Use docker-compose.dev.yml?
+
+**Best for**: Day-to-day development and debugging
+
+**Benefits**:
+- ✅ Run app directly in Visual Studio with full debugging
+- ✅ Hot reload and fast code changes
+- ✅ RabbitMQ runs in Docker (consistent environment)
+- ✅ No need to rebuild Docker images for code changes
+
+### 📄 File: docker-compose.dev.yml
+
+```yaml
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: orderflow-rabbitmq-dev
+    hostname: rabbitmq-dev
+    ports:
+      - "5672:5672"    # Message broker port
+      - "15672:15672"  # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - rabbitmq_dev_data:/var/lib/rabbitmq
+    networks:
+      - orderflow-dev-network
+
+networks:
+  orderflow-dev-network:
+    driver: bridge
+
+volumes:
+  rabbitmq_dev_data:
+    name: orderflow_rabbitmq_dev_data
+```
+
+### 🔍 What Each Part Does
+
+#### ⚙️ Service Configuration
 
 ```yaml
 rabbitmq:
-  image: rabbitmq:3-management
-  container_name: orderflow-rabbitmq
-  hostname: rabbitmq
-  ports:
-    - "5672:5672"
-    - "15672:15672"
-  environment:
-    RABBITMQ_DEFAULT_USER: admin
-    RABBITMQ_DEFAULT_PASS: admin123
-  healthcheck:
-    test: rabbitmq-diagnostics -q ping
-    interval: 10s
-    timeout: 5s
-    retries: 5
-    start_period: 30s
-  volumes:
-    - rabbitmq_data:/var/lib/rabbitmq
-  networks:
-    - orderflow-network
+  image: rabbitmq:3-management  # Official RabbitMQ with web UI
+  container_name: orderflow-rabbitmq-dev  # Easy to identify
+  hostname: rabbitmq-dev  # Used for DNS resolution
 ```
 
-#### Breakdown by Section
+**Key Points**:
+- 🐰 Uses official RabbitMQ image with management plugin
+- 🏷️ Container gets a friendly name for easy reference
+- 🌐 Hostname allows connection via name instead of IP
 
-##### 1. **Image Selection**
-
-```yaml
-image: rabbitmq:3-management
-```
-
-**What it does:**
-- Pulls the official RabbitMQ image with the **management plugin** pre-installed
-- Version 3.x is the stable branch with .NET client compatibility
-
-**Why `3-management`?**
-- Includes the **Web UI** for monitoring queues, exchanges, and connections
-- Essential for debugging message flow in development
-
-**Alternative Tags:**
-- `rabbitmq:3` � RabbitMQ without management UI (production)
-- `rabbitmq:3-alpine` � Smaller image size (~50MB less)
-- `rabbitmq:3.12-management` � Specific version pinning
-
-**Best Practice:**
-```yaml
-image: rabbitmq:3.12-management  # Pin versions in production
-```
-
----
-
-##### 2. **Container & Hostname**
-
-```yaml
-container_name: orderflow-rabbitmq
-hostname: rabbitmq
-```
-
-**Container Name:**
-- Assigns a **static name** to the container
-- Allows direct reference: `docker logs orderflow-rabbitmq`
-- Without this, Docker generates random names like `orderflowcore-rabbitmq-1`
-
-**Hostname:**
-- Sets the internal **network hostname**
-- Other containers use `rabbitmq` to connect (not `localhost`)
-- Critical for service discovery within Docker networks
-
-**Example Usage in App:**
-```csharp
-// In appsettings.json or environment variables
-"RabbitMq": {
-  "HostName": "rabbitmq",  // Uses the hostname defined in docker-compose
-  "Port": 5672
-}
-```
-
----
-
-##### 3. **Port Mappings**
+#### 🔌 Port Mappings
 
 ```yaml
 ports:
-  - "5672:5672"   # AMQP protocol (for app connections)
-  - "15672:15672" # Management UI (for browser)
+  - "5672:5672"    # Your app connects here
+  - "15672:15672"  # Web UI for monitoring
 ```
 
-**Format:** `"HOST:CONTAINER"`
+**What This Means**:
+- 📨 Port 5672: Application sends/receives messages
+- 🖥️ Port 15672: Browser access to RabbitMQ dashboard
 
-| Host Port | Container Port | Purpose |
-|-----------|----------------|---------|
-| 5672 | 5672 | **AMQP Protocol** � Message broker communication |
-| 15672 | 15672 | **Management UI** � Web interface at http://localhost:15672 |
-
-**Why Expose Ports?**
-- `5672` ? Allows **OrderFlow.Core** to connect to RabbitMQ
-- `15672` ? Allows **developers** to access the web UI from the host machine
-
-**Internal vs External Access:**
-- **Internal** (container-to-container): Uses `rabbitmq:5672` via Docker network
-- **External** (host machine): Uses `localhost:5672`
-
----
-
-##### 4. **Environment Variables**
+#### 🔐 Environment Variables
 
 ```yaml
 environment:
@@ -238,40 +140,12 @@ environment:
   RABBITMQ_DEFAULT_PASS: admin123
 ```
 
-**What it does:**
-- Overrides default RabbitMQ credentials (`guest/guest`)
-- Creates a new user with **full permissions**
+**Why Needed**:
+- 🚫 Default `guest/guest` only works from localhost
+- 🔑 Custom credentials allow Docker containers to connect
+- ⚠️ **Note**: Change password for production!
 
-**Default Behavior:**
-- RabbitMQ's default `guest/guest` user only works from `localhost`
-- Custom credentials enable remote connections (required for Docker)
-
-**Security Considerations:**
-
-?? **Development:**
-```yaml
-environment:
-  RABBITMQ_DEFAULT_USER: admin
-  RABBITMQ_DEFAULT_PASS: admin123  # Hardcoded for simplicity
-```
-
-? **Production:**
-```yaml
-environment:
-  RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-  RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
-```
-
-Use **Docker secrets** or **environment files**:
-```bash
-# .env file
-RABBITMQ_USER=admin
-RABBITMQ_PASS=SecureP@ssw0rd!
-```
-
----
-
-##### 5. **Health Checks**
+#### 💚 Health Checks
 
 ```yaml
 healthcheck:
@@ -282,314 +156,209 @@ healthcheck:
   start_period: 30s
 ```
 
-**What it does:**
-- Runs `rabbitmq-diagnostics ping` **every 10 seconds**
-- Marks container as **healthy** when ping succeeds
-- Retries **5 times** before marking as **unhealthy**
+**Purpose**:
+- ✅ Ensures RabbitMQ is fully ready before app connects
+- 🛡️ Prevents "connection refused" errors on startup
+- ⏱️ 30-second grace period for initialization
 
-**Parameter Breakdown:**
-
-| Parameter | Value | Explanation |
-|-----------|-------|-------------|
-| `test` | `rabbitmq-diagnostics -q ping` | Command to check if RabbitMQ is ready |
-| `interval` | `10s` | Check every 10 seconds |
-| `timeout` | `5s` | Wait 5 seconds for response |
-| `retries` | `5` | Try 5 times before declaring failure |
-| `start_period` | `30s` | Grace period before starting checks |
-
-**Why Health Checks Matter:**
-
-Without health checks:
-```yaml
-depends_on:
-  - rabbitmq  # Only waits for container to start (not ready)
+**Health Check Timeline**:
+```
+0s   → 🟡 Container starts
+30s  → 🔵 First health check
+40s  → 🔄 Retry if needed
+50s  → 🟢 Usually healthy by now
 ```
 
-With health checks:
-```yaml
-depends_on:
-  rabbitmq:
-    condition: service_healthy  # Waits until RabbitMQ is ready
-```
-
-**Lifecycle Timeline:**
-```
-0s    ? Container starts
-      ?
-30s   ? start_period ends ? Begin health checks
-      ?
-30s   ? ? Check 1: Fail (RabbitMQ still initializing)
-40s   ? ? Check 2: Fail
-50s   ? ? Check 3: Success ? Container marked HEALTHY
-      ?
-      ??> OrderFlow.Core starts (dependency satisfied)
-```
-
----
-
-##### 6. **Volumes (Data Persistence)**
+#### 💾 Data Persistence
 
 ```yaml
 volumes:
-  - rabbitmq_data:/var/lib/rabbitmq
+  - rabbitmq_dev_data:/var/lib/rabbitmq
 ```
 
-**What it does:**
-- Mounts a **named volume** to persist RabbitMQ data
-- Data survives container restarts and rebuilds
+**What Gets Saved**:
+- 📦 Queues and exchanges
+- 📧 Messages (if persistent)
+- 👤 User accounts
+- ⚙️ Configuration
 
-**Volume Mounting:**
-
-| Source | Destination | Purpose |
-|--------|-------------|---------|
-| `rabbitmq_data` (named volume) | `/var/lib/rabbitmq` (container path) | RabbitMQ data directory |
-
-**What Gets Persisted:**
-- Queues, exchanges, bindings
-- Messages (if marked persistent)
-- User accounts and permissions
-- Configuration changes
-
-**Without Volume:**
-```
-1. Create queues and messages
-2. docker-compose down
-3. docker-compose up
-   ? All data LOST (queues gone, messages gone)
-```
-
-**With Volume:**
-```
-1. Create queues and messages
-2. docker-compose down
-3. docker-compose up
-   ? All data RESTORED (queues exist, messages intact)
-```
-
-**Volume Management:**
+**Why Important**:
 ```bash
-# List volumes
-docker volume ls
+# ❌ Without volume
+docker-compose down  # All data lost!
 
-# Inspect volume
-docker volume inspect orderflow_rabbitmq_data
-
-# Remove volume (deletes data!)
-docker volume rm orderflow_rabbitmq_data
+# ✅ With volume
+docker-compose down  # Data preserved
+docker-compose up    # Everything restored
 ```
 
----
-
-##### 7. **Networks**
+#### 🌐 Networking
 
 ```yaml
 networks:
-  - orderflow-network
+  - orderflow-dev-network
 ```
 
-**What it does:**
-- Attaches RabbitMQ to the custom bridge network
-- Enables communication with other services (OrderFlow.Core)
+**How It Works**:
+- 🔒 Creates isolated network for containers
+- 🔍 Enables DNS-based service discovery
+- 🏷️ Containers use names instead of IPs
 
-**Network Isolation:**
+### ⚙️ Configuration in Your App
 
-? **Without Custom Network:**
-```
-orderflow-core ? tries to connect to "rabbitmq"
-                 ? DNS resolution fails
-                 ? Connection error
+When running from Visual Studio, your `appsettings.json` should use:
+
+```json
+{
+  "RabbitMq": {
+    "HostName": "localhost",  // ← Use localhost (app not in container)
+    "Port": 5672,
+    "UserName": "admin",
+    "Password": "admin123"
+  }
+}
 ```
 
-? **With Custom Network:**
-```
-orderflow-core ? resolves "rabbitmq" via Docker DNS
-               ? connects to orderflow-rabbitmq container
-               ? success
+### 🔄 Development Workflow
+
+```bash
+# 1. Start RabbitMQ
+docker-compose -f docker-compose.dev.yml up -d
+
+# 2. Verify it's running
+docker-compose -f docker-compose.dev.yml ps
+# Should show: orderflow-rabbitmq-dev (healthy) ✅
+
+# 3. Check logs if needed
+docker-compose -f docker-compose.dev.yml logs -f rabbitmq
+
+# 4. Open Visual Studio and press F5 to debug 🐛
+
+# 5. When done, stop RabbitMQ
+docker-compose -f docker-compose.dev.yml down
 ```
 
 ---
 
-### OrderFlow.Core Application Service
+## 🚀 Full Stack Setup
 
-#### Complete Configuration
+### 🤔 Why Use docker-compose.yml?
+
+**Best for**: Integration testing, demos, production-like testing
+
+**Benefits**:
+- ✅ Complete system in Docker
+- ✅ Test exactly as it will run in production
+- ✅ No local dependencies needed
+- ✅ Easy to share entire setup
+
+### 📄 File: docker-compose.yml
+
+```yaml
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: orderflow-rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - orderflow-network
+
+  orderflow-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: orderflow-core
+    hostname: orderflow-core
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_URLS=http://+:8080
+      - RabbitMq__HostName=rabbitmq  # ← Uses service name
+      - RabbitMq__Port=5672
+      - RabbitMq__UserName=admin
+      - RabbitMq__Password=admin123
+      - RabbitMq__ExchangeName=order_exchange
+      - RabbitMq__ExchangeType=topic
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - orderflow-network
+    restart: unless-stopped
+
+networks:
+  orderflow-network:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+    name: orderflow_rabbitmq_data
+```
+
+### 🔑 Key Differences from Dev Setup
+
+#### 🏗️ Application Service
 
 ```yaml
 orderflow-core:
   build:
     context: .
     dockerfile: Dockerfile
-  container_name: orderflow-core
-  hostname: orderflow-core
-  ports:
-    - "8080:8080"
-  environment:
-    - ASPNETCORE_ENVIRONMENT=Development
-    - ASPNETCORE_HTTP_PORTS=8080
-    - ASPNETCORE_URLS=http://+:8080
-    - RabbitMq__HostName=rabbitmq
-    - RabbitMq__Port=5672
-    - RabbitMq__UserName=admin
-    - RabbitMq__Password=admin123
-    - RabbitMq__ExchangeName=order_exchange
-    - RabbitMq__ExchangeType=topic
-  depends_on:
-    rabbitmq:
-      condition: service_healthy
-  networks:
-    - orderflow-network
-  restart: unless-stopped
 ```
 
-#### Breakdown by Section
+**What Happens**:
+- 🔨 Builds your application from source
+- 📦 Creates optimized container image
+- 🚀 Runs application inside Docker
 
-##### 1. **Build Configuration**
+#### 🔗 Service Dependencies
 
 ```yaml
-build:
-  context: .
-  dockerfile: Dockerfile
+depends_on:
+  rabbitmq:
+    condition: service_healthy
 ```
 
-**Build Context:**
-- `.` ? Current directory (where `docker-compose.yml` lives)
-- Docker sends **all files** in this directory to the build daemon
-
-**Dockerfile:**
-- Specifies which Dockerfile to use
-- Default: `Dockerfile` in the context directory
-- Can be changed: `dockerfile: Dockerfile.production`
-
-**Build Process:**
-```bash
-# Manual build equivalent
-docker build -t orderflow-core:latest -f Dockerfile .
+**Startup Order**:
+```
+1. 🟡 Start RabbitMQ
+2. ⏳ Wait for health check to pass
+3. 🟢 Start OrderFlow.Core
+4. ✅ App connects successfully
 ```
 
-**Build vs Image:**
-
-| Use `build:` | Use `image:` |
-|-------------|-------------|
-| Build from source code | Pull pre-built image |
-| Development environments | Production deployments |
-| Custom Dockerfile | Official/public images |
-
-**Example with Image:**
-```yaml
-orderflow-core:
-  image: myregistry.azurecr.io/orderflow-core:v1.2.3
-  # No build needed, just pull and run
-```
-
----
-
-##### 2. **Container & Hostname**
-
-```yaml
-container_name: orderflow-core
-hostname: orderflow-core
-```
-
-**Same principles as RabbitMQ:**
-- `container_name` ? Static name for commands (`docker logs orderflow-core`)
-- `hostname` ? Internal DNS name on the Docker network
-
-**Hostname Use Cases:**
-- Service discovery (if you add more services)
-- Logging and tracing (hostname appears in logs)
-- Debugging (easily identify which container logs belong to)
-
----
-
-##### 3. **Port Mappings**
-
-```yaml
-ports:
-  - "8080:8080"
-```
-
-**Why Only HTTP (8080)?**
-
-In the simplified `Dockerfile.simple`, we removed HTTPS to avoid certificate issues:
-
-```dockerfile
-# Original (with HTTPS)
-EXPOSE 8080
-EXPOSE 8081
-
-# Simplified (HTTP only)
-EXPOSE 8080
-```
-
-**HTTPS in Docker:**
-
-To enable HTTPS, you'd need:
-1. **Development Certificate:**
-   ```bash
-   dotnet dev-certs https -ep ${HOME}/.aspnet/https/aspnetapp.pfx -p YourPassword
-   ```
-
-2. **Mount Certificate:**
-   ```yaml
-   volumes:
-     - ~/.aspnet/https:/https:ro
-   environment:
-     - ASPNETCORE_Kestrel__Certificates__Default__Password=YourPassword
-     - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
-   ```
-
-3. **Expose Port:**
-   ```yaml
-   ports:
-     - "8080:8080"
-     - "8081:8081"
-   ```
-
-**For production**, use a **reverse proxy** (Nginx, Traefik) to handle SSL termination.
-
----
-
-##### 4. **Environment Variables**
+#### ⚙️ Environment Variables
 
 ```yaml
 environment:
-  - ASPNETCORE_ENVIRONMENT=Development
-  - ASPNETCORE_HTTP_PORTS=8080
-  - ASPNETCORE_URLS=http://+:8080
-  - RabbitMq__HostName=rabbitmq
-  - RabbitMq__Port=5672
-  - RabbitMq__UserName=admin
-  - RabbitMq__Password=admin123
-  - RabbitMq__ExchangeName=order_exchange
-  - RabbitMq__ExchangeType=topic
+  - RabbitMq__HostName=rabbitmq  # ← Different from dev!
 ```
 
-#### ASP.NET Core Configuration
+**Why Different**:
+- 🌐 Both services in same Docker network
+- 🏷️ Use service name, not `localhost`
+- 🔍 Docker DNS resolves `rabbitmq` to correct container
 
-| Variable | Value | Purpose |
-|----------|-------|---------|
-| `ASPNETCORE_ENVIRONMENT` | `Development` | Enables Swagger UI, detailed errors |
-| `ASPNETCORE_HTTP_PORTS` | `8080` | Tells Kestrel to listen on port 8080 |
-| `ASPNETCORE_URLS` | `http://+:8080` | Bind to all network interfaces |
-
-**Environment Behavior:**
-
-```csharp
-// In Program.cs
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();      // ? Enabled in Development
-    app.UseSwaggerUI();
-}
-```
-
-#### RabbitMQ Configuration Override
-
-**Double Underscore (`__`) Syntax:**
-
+**Double Underscore Syntax**:
 ```yaml
 RabbitMq__HostName=rabbitmq
 ```
-
 Maps to:
 ```json
 {
@@ -599,1178 +368,279 @@ Maps to:
 }
 ```
 
-**How It Works:**
-
-1. **appsettings.json** (default):
-   ```json
-   "RabbitMq": {
-     "HostName": "localhost",
-     "Port": 5672
-   }
-   ```
-
-2. **Environment Variable Override**:
-   ```yaml
-   RabbitMq__HostName=rabbitmq
-   ```
-
-3. **Final Configuration** (what the app sees):
-   ```json
-   "RabbitMq": {
-     "HostName": "rabbitmq",  // ? Overridden
-     "Port": 5672
-   }
-   ```
-
-**Why Override?**
-
-| Environment | HostName |
-|------------|----------|
-| Local Development | `localhost` (RabbitMQ on host) |
-| Docker Compose | `rabbitmq` (RabbitMQ service name) |
-| Kubernetes | `rabbitmq-service.default.svc.cluster.local` |
-
-**Configuration Hierarchy:**
-```
-1. appsettings.json (lowest priority)
-2. appsettings.{Environment}.json
-3. Environment Variables
-4. Command-line arguments (highest priority)
-```
-
----
-
-##### 5. **Dependency Management**
-
-```yaml
-depends_on:
-  rabbitmq:
-    condition: service_healthy
-```
-
-**What it does:**
-- **Waits** for RabbitMQ to be **healthy** before starting OrderFlow.Core
-- Prevents connection failures during startup
-
-**Dependency Strategies:**
-
-? **Basic (Unsafe):**
-```yaml
-depends_on:
-  - rabbitmq  # Only waits for container to START (not ready!)
-```
-
-**Problem:**
-```
-1. RabbitMQ container starts
-2. OrderFlow.Core starts immediately
-3. App tries to connect ? RabbitMQ still initializing
-4. Connection fails ? App crashes or hangs
-```
-
-? **Health Check (Recommended):**
-```yaml
-depends_on:
-  rabbitmq:
-    condition: service_healthy  # Waits until health check passes
-```
-
-**Result:**
-```
-1. RabbitMQ container starts
-2. Health checks run (30s grace period + retries)
-3. RabbitMQ marked HEALTHY
-4. OrderFlow.Core starts
-5. App connects successfully
-```
-
-**Startup Timeline:**
-```
-0s    ? docker-compose up
-      ?
-      ??> Start rabbitmq container
-      ?
-30s   ? Health check grace period
-      ?
-50s   ? RabbitMQ HEALTHY
-      ?   ??> Dependency satisfied
-      ?
-51s   ? Start orderflow-core container
-      ?
-55s   ? OrderFlow.Core connects to RabbitMQ
-      ?   ??> Success!
-```
-
----
-
-##### 6. **Restart Policy**
+#### 🔄 Restart Policy
 
 ```yaml
 restart: unless-stopped
 ```
 
-**Restart Policies:**
-
-| Policy | Behavior |
-|--------|----------|
-| `no` | Never restart (default) |
-| `always` | Always restart (even after `docker-compose down`) |
-| `on-failure` | Restart only if exit code != 0 |
-| `unless-stopped` | Always restart **unless manually stopped** |
-
-**Why `unless-stopped`?**
-
-? **Wanted Behavior:**
-- App crashes ? Docker restarts it automatically
-- RabbitMQ connection lost ? App retries, Docker restarts if needed
-- Machine reboots ? Services start automatically
-
-? **Unwanted Behavior:**
-- `docker-compose down` ? Services should STOP (not restart)
-- Manual stop ? Services should STAY stopped
-
-**Example Scenarios:**
-
-```bash
-# Scenario 1: App crashes
-App crashes ? Exit code 1
-              ? Docker restarts container
-              ? App runs again
-
-# Scenario 2: Intentional stop
-docker-compose down ? All services stop
-                     ? Services stay stopped (unless-stopped respects this)
-
-# Scenario 3: Machine reboot
-Machine restarts ? Docker daemon starts
-                  ? Containers restart automatically
-```
-
-**Production Recommendation:**
-
-```yaml
-restart: always  # For critical services in production
-```
-
-But consider using **orchestrators** (Kubernetes, Docker Swarm) instead for better control.
+**Behavior**:
+- 💥 App crashes → Docker restarts automatically
+- 🛑 Manual stop → Stays stopped
+- 🔄 Machine reboots → Services start automatically
 
 ---
 
-## Networking
+## 🔧 Understanding the Configuration
 
-### Network Definition
+### 📊 Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  🐳 Docker Environment                   │
+│                                                          │
+│  ┌──────────────────┐         ┌──────────────────┐     │
+│  │  🐰 RabbitMQ     │         │  🚀 OrderFlow    │     │
+│  │                  │         │     Core         │     │
+│  │  Port: 5672      │◄────────│   (.NET 8)       │     │
+│  │  UI: 15672       │         │  Port: 8080      │     │
+│  │  User: admin     │         │  Swagger: /swagger│    │
+│  └──────────────────┘         └──────────────────┘     │
+│           │                            │                │
+│           └────────┬───────────────────┘                │
+│                    │                                    │
+│          ┌─────────▼─────────┐                         │
+│          │  🌐 Docker Network│                         │
+│          │  (Bridge Driver)  │                         │
+│          └───────────────────┘                         │
+│                                                          │
+│  ┌───────────────────────────────────────────┐         │
+│  │  💾 Volume: rabbitmq_data                 │         │
+│  │  (Persistent Storage)                     │         │
+│  └───────────────────────────────────────────┘         │
+└─────────────────────────────────────────────────────────┘
+          │                            │
+          │                            │
+    localhost:15672           localhost:8080
+    (🐰 RabbitMQ UI)          (🌐 API/Swagger)
+```
+
+### 🔌 Port Mappings Explained
+
+| Service | Container Port | Host Port | Access From |
+|---------|----------------|-----------|-------------|
+| 🐰 RabbitMQ AMQP | 5672 | 5672 | 📱 Application |
+| 🖥️ RabbitMQ UI | 15672 | 15672 | 🌐 Browser |
+| 🚀 OrderFlow API | 8080 | 8080 | 🌐 Browser/Postman |
+
+**Port Format**: `"HOST:CONTAINER"`
 
 ```yaml
-networks:
-  orderflow-network:
-    driver: bridge
-    name: orderflow-network
+ports:
+  - "8080:8080"  # localhost:8080 → container:8080
 ```
 
-#### Bridge Network Explained
+### 🌐 Networking Concepts
 
-**What is a Bridge Network?**
-
-A **bridge network** is a **private internal network** created by Docker. Containers on the same bridge can communicate with each other using **container names** as hostnames.
-
-**Network Drivers:**
-
-| Driver | Use Case |
-|--------|----------|
-| `bridge` | Default, single-host container communication |
-| `host` | Container shares host network (no isolation) |
-| `overlay` | Multi-host communication (Swarm, Kubernetes) |
-| `macvlan` | Assign MAC addresses to containers |
-| `none` | No networking (isolated container) |
-
-#### How Bridge Networks Work
+#### 🔗 Container-to-Container Communication
 
 ```
-???????????????????????????????????????????????????????
-?               Host Machine (Your Computer)          ?
-?                                                     ?
-?  ????????????????????????????????????????????????  ?
-?  ?       orderflow-network (172.18.0.0/16)      ?  ?
-?  ?                                              ?  ?
-?  ?  ???????????????????   ???????????????????  ?  ?
-?  ?  ?   rabbitmq      ?   ? orderflow-core  ?  ?  ?
-?  ?  ?  172.18.0.2     ?   ?   172.18.0.3    ?  ?  ?
-?  ?  ?                 ?   ?                 ?  ?  ?
-?  ?  ?  hostname:      ?   ?  hostname:      ?  ?  ?
-?  ?  ?  rabbitmq       ?????  rabbitmq:5672  ?  ?  ?
-?  ?  ???????????????????   ???????????????????  ?  ?
-?  ?                                              ?  ?
-?  ????????????????????????????????????????????????  ?
-?                       ?                             ?
-?                       ?                             ?
-?                  Port Mapping                       ?
-?                       ?                             ?
-?  ?????????????????????????????????????????????????  ?
-?  ?         Host Network (localhost)              ?  ?
-?  ?   - localhost:5672  ? rabbitmq:5672           ?  ?
-?  ?   - localhost:8080  ? orderflow-core:8080     ?  ?
-?  ?   - localhost:15672 ? rabbitmq:15672          ?  ?
-?  ?????????????????????????????????????????????????  ?
-???????????????????????????????????????????????????????
+Inside Docker Network:
+  orderflow-core connects to: rabbitmq:5672
+  
+From Your Computer:
+  🌐 Browser connects to: localhost:8080
+  💻 App (Visual Studio) connects to: localhost:5672
 ```
 
-#### DNS Resolution
+#### 🏷️ Why Use Service Names?
 
-**Automatic DNS:**
-
-Docker provides automatic DNS resolution for **container names** and **service names**.
-
+❌ **Bad** (Using IP addresses):
 ```yaml
-# OrderFlow.Core connects using service name
-RabbitMq__HostName=rabbitmq
+RabbitMq__HostName: 172.18.0.2  # Can change on restart!
 ```
 
-**Behind the Scenes:**
-```
-1. App tries to connect to "rabbitmq"
-2. Docker DNS resolves "rabbitmq" ? 172.18.0.2
-3. Connection established
-```
-
-**Why Not Use IP Addresses?**
-
-? **Bad:**
+✅ **Good** (Using service names):
 ```yaml
-RabbitMq__HostName=172.18.0.2  # IP can change between restarts
+RabbitMq__HostName: rabbitmq  # Always resolves correctly
 ```
 
-? **Good:**
-```yaml
-RabbitMq__HostName=rabbitmq  # Name is always consistent
-```
+### 💾 Volume Persistence
 
-#### Network Isolation
-
-**Containers on the same network:**
-```
-rabbitmq ?? orderflow-core  ? Can communicate
-```
-
-**Containers on different networks:**
-```
-rabbitmq (network A) ?X? other-app (network B)  ? Cannot communicate
-```
-
-**Multiple Networks:**
-
-```yaml
-orderflow-core:
-  networks:
-    - orderflow-network  # Internal communication
-    - public-network     # External API access
-```
-
-#### Network Commands
+#### ❌ What Happens Without Volumes
 
 ```bash
-# List networks
-docker network ls
-
-# Inspect network
-docker network inspect orderflow-network
-
-# View connected containers
-docker network inspect orderflow-network --format '{{json .Containers}}' | jq
-
-# Connect a container to network
-docker network connect orderflow-network my-container
-
-# Disconnect
-docker network disconnect orderflow-network my-container
-
-# Remove network (only if no containers attached)
-docker network rm orderflow-network
+1. Start RabbitMQ
+2. Create queues and messages
+3. docker-compose down
+4. Start again
+→ 💥 All data LOST!
 ```
 
----
+#### ✅ What Happens With Volumes
 
-## Volumes and Data Persistence
-
-### Volume Definition
-
-```yaml
-volumes:
-  rabbitmq_data:
-    name: orderflow_rabbitmq_data
-```
-
-#### Why Named Volumes?
-
-**Named vs Anonymous Volumes:**
-
-| Named Volume | Anonymous Volume |
-|--------------|------------------|
-| `rabbitmq_data` | `a1b2c3d4...` (random hash) |
-| Explicit name | Auto-generated name |
-| Easy to manage | Hard to identify |
-| Survives `down -v` | Deleted with `down -v` |
-
-**Named Volume Usage:**
-```yaml
-services:
-  rabbitmq:
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-
-volumes:
-  rabbitmq_data:
-    name: orderflow_rabbitmq_data
-```
-
-#### Volume Storage Location
-
-**Where is data stored?**
-
-Docker stores volumes in:
-```
-# Linux
-/var/lib/docker/volumes/orderflow_rabbitmq_data/_data
-
-# Windows (WSL2)
-\\wsl$\docker-desktop-data\data\docker\volumes\orderflow_rabbitmq_data\_data
-
-# Mac
-~/Library/Containers/com.docker.docker/Data/vms/0/data/docker/volumes/orderflow_rabbitmq_data/_data
-```
-
-**Access Volume Data:**
 ```bash
-# Linux/Mac
-docker volume inspect orderflow_rabbitmq_data --format '{{.Mountpoint}}'
-
-# Windows (WSL2)
-explorer.exe $(wslpath -w $(docker volume inspect orderflow_rabbitmq_data --format '{{.Mountpoint}}'))
+1. Start RabbitMQ
+2. Create queues and messages
+3. docker-compose down
+4. Start again
+→ 🎉 All data RESTORED!
 ```
 
-#### What RabbitMQ Stores
+#### 📦 Volume Commands
 
-**Inside `/var/lib/rabbitmq`:**
-```
-/var/lib/rabbitmq/
-??? mnesia/                  # Database files
-?   ??? rabbit@rabbitmq/
-?   ?   ??? queues.dat       # Queue definitions
-?   ?   ??? exchanges.dat    # Exchange definitions
-?   ?   ??? bindings.dat     # Routing bindings
-?   ?   ??? messages.dat     # Persisted messages
-??? schema/                  # RabbitMQ schema
-??? plugins/                 # Plugin data
-```
-
-#### Volume Lifecycle
-
-**Scenario 1: Normal Operation**
 ```bash
-docker-compose up     # Volume created (if doesn't exist)
-                      # Data persisted to volume
+# List all volumes
+docker volume ls
 
-docker-compose down   # Containers stopped and removed
-                      # Volume remains intact
+# Inspect volume details
+docker volume inspect orderflow_rabbitmq_data
 
-docker-compose up     # Volume reused
-                      # Data restored automatically
-```
+# Remove volume (deletes data!)
+docker volume rm orderflow_rabbitmq_data
 
-**Scenario 2: Volume Removal**
-```bash
-docker-compose down -v  # Remove containers AND volumes
-                        # All data deleted!
-```
-
-**Scenario 3: Backup**
-```bash
-# Backup volume to tar
+# Backup volume
 docker run --rm \
   -v orderflow_rabbitmq_data:/data \
   -v $(pwd):/backup \
   alpine tar czf /backup/rabbitmq-backup.tar.gz -C /data .
-
-# Restore from tar
-docker run --rm \
-  -v orderflow_rabbitmq_data:/data \
-  -v $(pwd):/backup \
-  alpine sh -c "cd /data && tar xzf /backup/rabbitmq-backup.tar.gz"
-```
-
-#### Volume vs Bind Mounts
-
-**Volume (Recommended for production data):**
-```yaml
-volumes:
-  - rabbitmq_data:/var/lib/rabbitmq  # Named volume
-```
-
-**Bind Mount (Recommended for configuration):**
-```yaml
-volumes:
-  - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro  # Host file ? Container
-```
-
-**Comparison:**
-
-| Feature | Volume | Bind Mount |
-|---------|--------|------------|
-| Management | Docker-managed | User-managed |
-| Performance | Optimized | Depends on OS |
-| Backup | `docker volume` commands | Regular file tools |
-| Portability | Cross-platform | OS-dependent paths |
-| Security | Isolated | Host filesystem access |
-
----
-
-## Service Orchestration
-
-### Startup Order
-
-Docker Compose orchestrates services in this order:
-
-```
-1. Networks
-   ??> Create orderflow-network
-
-2. Volumes
-   ??> Create orderflow_rabbitmq_data
-
-3. Services (dependency order)
-   ??> Start rabbitmq
-   ?   ??> Wait for health check
-   ?       ??> Status: HEALTHY
-   ?
-   ??> Start orderflow-core
-       ??> Connect to rabbitmq
-```
-
-### Dependency Graph
-
-```
-???????????????????????????????????????????????
-?           Service Dependencies              ?
-???????????????????????????????????????????????
-
-orderflow-core
-      ?
-      ? depends_on:
-      ?   rabbitmq:
-      ?     condition: service_healthy
-      ?
-      ?
-  rabbitmq
-      ?
-      ? healthcheck:
-      ?   test: rabbitmq-diagnostics -q ping
-      ?   interval: 10s
-      ?   retries: 5
-      ?
-      ?
-  HEALTHY ? orderflow-core starts
-```
-
-### Parallel vs Sequential Startup
-
-**Without Dependencies:**
-```yaml
-services:
-  rabbitmq:
-    # ...
-  orderflow-core:
-    # No depends_on
-```
-
-**Result:** Both start **in parallel** (race condition!)
-
-```
-Time  ? rabbitmq       ? orderflow-core
-??????????????????????????????????????????
-0s    ? Starting...    ? Starting...
-1s    ? Initializing   ? Connecting... ? Failed
-2s    ? Ready          ? Crashed
-```
-
-**With Dependencies:**
-```yaml
-services:
-  rabbitmq:
-    healthcheck: ...
-  orderflow-core:
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-```
-
-**Result:** Sequential startup (safe)
-
-```
-Time  ? rabbitmq       ? orderflow-core
-??????????????????????????????????????????
-0s    ? Starting...    ? Waiting...
-30s   ? Health checks  ? Waiting...
-50s   ? HEALTHY        ? Starting...
-55s   ? Running        ? Connecting... ? Success
 ```
 
 ---
 
-## Environment Variables
+## ⌨️ Common Commands
 
-### Configuration Layers
-
-ASP.NET Core uses a **layered configuration system**:
-
-```
-???????????????????????????????????????????????
-?         Configuration Precedence            ?
-?         (Highest to Lowest Priority)        ?
-???????????????????????????????????????????????
-
-4. Command-line arguments (highest)
-   ?
-3. Environment variables ? docker-compose.yml sets these
-   ?
-2. appsettings.{Environment}.json
-   ?
-1. appsettings.json (lowest)
-```
-
-### Environment Variable Formats
-
-#### List Format
-
-```yaml
-environment:
-  - ASPNETCORE_ENVIRONMENT=Development
-  - ASPNETCORE_URLS=http://+:8080
-  - RabbitMq__HostName=rabbitmq
-```
-
-#### Dictionary Format
-
-```yaml
-environment:
-  ASPNETCORE_ENVIRONMENT: Development
-  ASPNETCORE_URLS: http://+:8080
-  RabbitMq__HostName: rabbitmq
-```
-
-**Both are equivalent**, but list format is more common in Docker Compose.
-
-### Environment File
-
-**For sensitive data or many variables:**
-
-```yaml
-# docker-compose.yml
-services:
-  orderflow-core:
-    env_file:
-      - .env.development
-```
+### 💻 Development Workflow
 
 ```bash
-# .env.development
-ASPNETCORE_ENVIRONMENT=Development
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_USER=admin
-RABBITMQ_PASS=admin123
+# Start RabbitMQ only (for development)
+docker-compose -f docker-compose.dev.yml up -d
+
+# View logs
+docker-compose -f docker-compose.dev.yml logs -f rabbitmq
+
+# Check status
+docker-compose -f docker-compose.dev.yml ps
+
+# Stop RabbitMQ
+docker-compose -f docker-compose.dev.yml down
+
+# Stop and remove data
+docker-compose -f docker-compose.dev.yml down -v
 ```
 
-**Advantages:**
-- ? Keep secrets out of `docker-compose.yml`
-- ? Different files for different environments (`.env.dev`, `.env.prod`)
-- ? Easier to manage many variables
-
----
-
-## Health Checks
-
-### Health Check Mechanism
-
-**How Health Checks Work:**
-
-```
-???????????????????????????????????????????????
-?          Health Check Lifecycle             ?
-???????????????????????????????????????????????
-
-Container Start
-    ?
-    ??> start_period (30s grace period)
-    ?   ??> No checks during this time
-    ?
-    ??> First Check (at 30s)
-    ?   ??> Run: rabbitmq-diagnostics -q ping
-    ?   ??> Result: Exit code 0 = Success, Non-zero = Failure
-    ?
-    ??> If Success:
-    ?   ??> Mark container HEALTHY
-    ?
-    ??> If Failure:
-        ??> Wait interval (10s)
-        ??> Retry (max 5 times)
-        ??> If all retries fail:
-            ??> Mark container UNHEALTHY
-```
-
-### Health Check States
-
-| State | Meaning |
-|-------|---------|
-| `starting` | Container started, within `start_period` |
-| `healthy` | Health check passed |
-| `unhealthy` | Health check failed after retries |
-
-### Custom Health Check Commands
-
-**RabbitMQ:**
-```yaml
-test: rabbitmq-diagnostics -q ping
-```
-
-**Alternative Checks:**
-```yaml
-# Check if management API responds
-test: ["CMD-SHELL", "curl -f http://localhost:15672/api/overview || exit 1"]
-
-# Check specific node
-test: ["CMD", "rabbitmqctl", "node_health_check"]
-```
-
-**ASP.NET Core:**
-```yaml
-orderflow-core:
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
-```
-
-### Health Check Best Practices
-
-? **Do:**
-- Use health checks for critical dependencies
-- Set appropriate `start_period` (allow app to initialize)
-- Use `interval` that matches app startup time (not too frequent)
-
-? **Don't:**
-- Set `interval` too low (creates unnecessary load)
-- Forget `timeout` (hanging checks block startup)
-- Skip `start_period` (false positives during startup)
-
----
-
-## Build Context and Dockerfile
-
-### Build Context
-
-```yaml
-build:
-  context: .
-  dockerfile: Dockerfile
-```
-
-**What Gets Sent to Docker?**
-
-The `context` directory and **all subdirectories**:
-
-```
-OrderFlow.Core/  ? context: .
-??? Controllers/
-??? Models/
-??? Infrastructure/
-??? Dockerfile
-??? docker-compose.yml
-??? OrderFlow.Core.csproj
-??? ... (everything)
-```
-
-### Optimizing Build Context
-
-**Problem:** Large context slows down builds.
-
-**Solution:** Use `.dockerignore`:
-
-```
-# .dockerignore
-**/.vs
-**/.vscode
-**/bin
-**/obj
-**/publish
-**/*.user
-**/node_modules
-```
-
-**Result:** Docker ignores these folders during build.
-
-### Multi-Stage Dockerfile
-
-**Current Dockerfile Structure:**
-
-```dockerfile
-# Stage 1: Base runtime
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-
-# Stage 2: Build
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-COPY ["OrderFlow.Core.csproj", "."]
-RUN dotnet restore
-COPY . .
-RUN dotnet build
-
-# Stage 3: Publish
-FROM build AS publish
-RUN dotnet publish -o /app/publish
-
-# Stage 4: Final
-FROM base AS final
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "OrderFlow.Core.dll"]
-```
-
-**Why Multi-Stage?**
-
-| Benefit | Explanation |
-|---------|-------------|
-| **Smaller Image** | Final image only contains runtime + binaries (not SDK) |
-| **Security** | No build tools in production image |
-| **Speed** | Layer caching speeds up rebuilds |
-
-**Image Size Comparison:**
-
-| Approach | Size |
-|----------|------|
-| Single-stage (with SDK) | ~720 MB |
-| Multi-stage (runtime only) | ~210 MB |
-
----
-
-## Port Mappings
-
-### Port Format
-
-```yaml
-ports:
-  - "HOST:CONTAINER"
-```
-
-**Examples:**
-
-```yaml
-ports:
-  - "8080:8080"    # Host 8080 ? Container 8080
-  - "80:8080"      # Host 80 ? Container 8080
-  - "8080"         # Random host port ? Container 8080
-```
-
-### Port Binding Modes
-
-**Bind to All Interfaces:**
-```yaml
-ports:
-  - "8080:8080"  # Accessible from anywhere
-```
-
-**Bind to Localhost Only:**
-```yaml
-ports:
-  - "127.0.0.1:8080:8080"  # Only accessible from host machine
-```
-
-**Bind to Specific IP:**
-```yaml
-ports:
-  - "192.168.1.100:8080:8080"
-```
-
-### Port Conflicts
-
-**Problem:**
-```bash
-docker-compose up
-# Error: Bind for 0.0.0.0:8080 failed: port is already allocated
-```
-
-**Solutions:**
-
-1. **Change Host Port:**
-   ```yaml
-   ports:
-     - "8081:8080"  # Use different host port
-   ```
-
-2. **Find Process Using Port:**
-   ```bash
-   # Windows
-   netstat -ano | findstr :8080
-   
-   # Linux/Mac
-   lsof -i :8080
-   ```
-
-3. **Stop Conflicting Service:**
-   ```bash
-   # Stop local .NET app using port 8080
-   ```
-
----
-
-## Dependency Management
-
-### Dependency Conditions
-
-Docker Compose supports multiple dependency conditions:
-
-```yaml
-depends_on:
-  rabbitmq:
-    condition: service_healthy        # ? Recommended
-    # OR
-    condition: service_started        # Basic (just waits for start)
-    # OR
-    condition: service_completed_successfully  # For init containers
-```
-
-### Complex Dependencies
-
-**Multiple Dependencies:**
-
-```yaml
-orderflow-core:
-  depends_on:
-    rabbitmq:
-      condition: service_healthy
-    database:
-      condition: service_healthy
-    redis:
-      condition: service_started
-```
-
-**Startup Order:**
-```
-1. Start rabbitmq, database, redis (parallel)
-2. Wait for rabbitmq ? HEALTHY
-3. Wait for database ? HEALTHY
-4. Wait for redis ? STARTED
-5. Start orderflow-core
-```
-
-### Init Containers
-
-**Pattern for Database Migrations:**
-
-```yaml
-services:
-  db-migrate:
-    image: orderflow-migrations
-    command: dotnet ef database update
-    depends_on:
-      database:
-        condition: service_healthy
-
-  orderflow-core:
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-```
-
----
-
-## Container Lifecycle
-
-### Common Commands
+### 🚀 Full Stack Commands
 
 ```bash
-# Start services (detached)
+# Start all services
 docker-compose up -d
 
 # Start and rebuild
 docker-compose up -d --build
 
-# View logs
+# View all logs
+docker-compose logs -f
+
+# View specific service logs
 docker-compose logs -f orderflow-core
 
-# Stop services (keep containers)
-docker-compose stop
+# Check status
+docker-compose ps
 
-# Start stopped services
-docker-compose start
-
-# Restart service
+# Restart a service
 docker-compose restart orderflow-core
 
-# Stop and remove containers
+# Stop all services
 docker-compose down
 
-# Stop and remove containers + volumes
+# Stop and remove volumes (data loss!)
 docker-compose down -v
+```
 
-# Stop and remove containers + images
-docker-compose down --rmi all
+### 🛠️ Useful Docker Commands
 
-# View service status
-docker-compose ps
-
-# View resource usage
-docker-compose stats
-
-# Execute command in running container
+```bash
+# Execute command in container
 docker-compose exec orderflow-core bash
 
-# Scale service (multiple instances)
-docker-compose up -d --scale orderflow-core=3
-```
+# View container resource usage
+docker-compose stats
 
-### Service States
+# Remove unused images and containers
+docker system prune -a
 
-```
-???????????????????????????????????????????????
-?           Container State Machine           ?
-???????????????????????????????????????????????
-
-          docker-compose up
-                  ?
-                  ?
-            ????????????
-            ? Created  ?
-            ????????????
-                  ?
-                  ?
-            ????????????
-            ? Starting ?
-            ????????????
-                  ?
-                  ?
-            ????????????
-            ? Running  ????????
-            ????????????      ?
-                  ?            ?
-        ????????????????????????
-        ?         ?            ?
-        ?         ?            ?
-   ?????????? ???????????     ?
-   ? Paused ? ? Exited  ?     ?
-   ?????????? ???????????     ?
-       ?            ?          ?
-       ?  restart   ?          ?
-       ?????????????????????????
-
-docker-compose down
-       ?
-       ?
-   Removed
+# View container IP address
+docker inspect orderflow-core | grep IPAddress
 ```
 
 ---
 
-## Best Practices Applied
+## 🔍 Troubleshooting
 
-### ? 1. **Named Containers & Networks**
+### ❌ Issue 1: Container Won't Start
 
-```yaml
-container_name: orderflow-rabbitmq
-hostname: rabbitmq
-networks:
-  - orderflow-network
-```
-
-**Why:** Easy identification, consistent DNS resolution
-
----
-
-### ? 2. **Health Checks for Dependencies**
-
-```yaml
-healthcheck:
-  test: rabbitmq-diagnostics -q ping
-  interval: 10s
-  retries: 5
-```
-
-**Why:** Prevents connection failures during startup
-
----
-
-### ? 3. **Data Persistence with Named Volumes**
-
-```yaml
-volumes:
-  rabbitmq_data:
-    name: orderflow_rabbitmq_data
-```
-
-**Why:** Data survives container restarts
-
----
-
-### ? 4. **Environment Variable Configuration**
-
-```yaml
-environment:
-  - RabbitMq__HostName=rabbitmq
-  - RabbitMq__UserName=admin
-```
-
-**Why:** Environment-specific settings without code changes
-
----
-
-### ? 5. **Restart Policies**
-
-```yaml
-restart: unless-stopped
-```
-
-**Why:** Automatic recovery from crashes
-
----
-
-### ? 6. **Port Consistency**
-
-```yaml
-ports:
-  - "8080:8080"  # Same port inside and outside
-```
-
-**Why:** Easier debugging and configuration
-
----
-
-### ? 7. **Multi-Stage Docker Build**
-
-```dockerfile
-FROM build AS publish
-RUN dotnet publish
-
-FROM base AS final
-COPY --from=publish /app/publish .
-```
-
-**Why:** Smaller, more secure production images
-
----
-
-### ? 8. **Network Isolation**
-
-```yaml
-networks:
-  orderflow-network:
-    driver: bridge
-```
-
-**Why:** Secure communication, DNS resolution
-
----
-
-### ? 9. **Graceful Startup Order**
-
-```yaml
-depends_on:
-  rabbitmq:
-    condition: service_healthy
-```
-
-**Why:** Services start in the correct order
-
----
-
-### ? 10. **Development vs Production Settings**
-
-```yaml
-ASPNETCORE_ENVIRONMENT: Development
-```
-
-**Why:** Different behavior for dev/prod (Swagger, error details)
-
----
-
-## Troubleshooting Container Issues
-
-### Issue 1: Container Won't Start
-
-**Symptoms:**
-```bash
-docker-compose ps
-# orderflow-core   Exit 1
-```
-
-**Diagnosis:**
+**Check logs**:
 ```bash
 docker-compose logs orderflow-core
 ```
 
-**Common Causes:**
-- Missing environment variables
-- Port conflicts
-- Connection to RabbitMQ failed
-- Application error
+**Common causes**:
+- 🔴 Port already in use
+- 🔴 Build errors
+- 🔴 Missing environment variables
 
-**Solution:**
-1. Check logs for specific error
-2. Verify RabbitMQ is healthy: `docker-compose ps`
-3. Check port availability: `netstat -ano | findstr :8080`
-
----
-
-### Issue 2: Cannot Connect to RabbitMQ
-
-**Symptoms:**
-```
-BrokerUnreachableException: None of the specified endpoints were reachable
-```
-
-**Diagnosis:**
+**Solution**:
 ```bash
-# Check if RabbitMQ is healthy
+# Check what's using the port
+netstat -ano | findstr :8080
+
+# Rebuild from scratch
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### 🔴 Issue 2: Can't Connect to RabbitMQ
+
+**Verify RabbitMQ is healthy**:
+```bash
 docker-compose ps
+# Should show "healthy" status ✅
+```
 
-# Check RabbitMQ logs
+**Check logs**:
+```bash
 docker-compose logs rabbitmq
-
-# Check network connectivity
-docker-compose exec orderflow-core ping rabbitmq
 ```
 
-**Common Causes:**
-- RabbitMQ not healthy yet
-- Wrong hostname (should be `rabbitmq`, not `localhost`)
-- Network not connected
-- Credentials mismatch
+**Common causes**:
+- ⏳ RabbitMQ still starting (wait 30-60 seconds)
+- 🔴 Wrong hostname in configuration
+- 🔴 Wrong credentials
 
-**Solution:**
+**Solution for Visual Studio (dev)**:
+```json
+{
+  "RabbitMq": {
+    "HostName": "localhost",  // ← Must be localhost
+    "UserName": "admin",
+    "Password": "admin123"
+  }
+}
+```
+
+**Solution for Docker (full stack)**:
 ```yaml
-# Ensure health check is configured
-depends_on:
-  rabbitmq:
-    condition: service_healthy
-
-# Verify hostname
 environment:
-  - RabbitMq__HostName=rabbitmq  # NOT localhost
+  - RabbitMq__HostName=rabbitmq  # ← Must be service name
 ```
 
----
+### ⚠️ Issue 3: Port Already in Use
 
-### Issue 3: Port Already in Use
-
-**Symptoms:**
+**Error**:
 ```
 Error: Bind for 0.0.0.0:8080 failed: port is already allocated
 ```
 
-**Solution:**
+**Solutions**:
 
-**Option 1: Change Host Port**
+**Option 1: Change host port**
 ```yaml
 ports:
-  - "8081:8080"  # Use different host port
+  - "8081:8080"  # Use different port
 ```
 
-**Option 2: Stop Conflicting Process**
+**Option 2: Find and stop conflicting process**
 ```bash
 # Windows
 netstat -ano | findstr :8080
@@ -1781,241 +651,193 @@ lsof -i :8080
 kill -9 <PID>
 ```
 
----
+### 🔨 Issue 4: Build Fails
 
-### Issue 4: Volume Permission Errors
-
-**Symptoms:**
+**Error**:
 ```
-Permission denied: '/var/lib/rabbitmq/...'
+failed to solve: process "/bin/sh -c dotnet restore" did not complete
 ```
 
-**Solution:**
+**Solutions**:
 
-**Linux/Mac:**
-```yaml
-rabbitmq:
-  user: "999:999"  # RabbitMQ UID:GID
+1. **Check internet connection** (NuGet needs to download packages) 🌐
+
+2. **Clear Docker cache**:
+```bash
+docker-compose build --no-cache
 ```
 
-**Or use named volumes (recommended):**
+3. **Build locally first**:
+```bash
+dotnet restore
+dotnet build
+docker-compose build
+```
+
+### 💾 Issue 5: Data Lost After Restart
+
+**Cause**: Volumes not configured or removed
+
+**Check volumes**:
+```bash
+docker volume ls | grep orderflow
+```
+
+**Ensure volume is defined**:
 ```yaml
 volumes:
   - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data:
+    name: orderflow_rabbitmq_data
 ```
 
----
-
-### Issue 5: Build Fails
-
-**Symptoms:**
-```
-Error: failed to solve: process "/bin/sh -c dotnet restore" did not complete successfully
-```
-
-**Common Causes:**
-- NuGet connectivity issues
-- Missing `.csproj` file
-- Wrong Dockerfile
-
-**Solution:**
-
-**Use Simplified Dockerfile:**
+**Avoid**:
 ```bash
-# Build locally first
-dotnet publish -c Release -o ./publish
+# ⚠️ This deletes volumes!
+docker-compose down -v
+```
 
-# Use Dockerfile.simple
-docker-compose -f docker-compose.yml build
+### 🐌 Issue 6: Slow Container Startup
+
+**Cause**: Large build context
+
+**Solution**: Create `.dockerignore` file:
+```
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/node_modules
+**/.git
+**/publish
 ```
 
 ---
 
-## Advanced Scenarios
+## 📚 Best Practices
 
-### Scenario 1: Multiple Environments
+### ✅ Do
 
-**Structure:**
-```
-??? docker-compose.yml         # Base configuration
-??? docker-compose.dev.yml     # Development overrides
-??? docker-compose.prod.yml    # Production overrides
-```
+1. **Use docker-compose.dev.yml for development**
+   - 🚀 Faster development cycle
+   - 🐛 Better debugging experience
 
-**docker-compose.yml:**
-```yaml
-services:
-  orderflow-core:
-    build:
-      context: .
-    environment:
-      - RabbitMq__HostName=rabbitmq
-```
+2. **Pin image versions in production**
+   ```yaml
+   image: rabbitmq:3.12-management
+   ```
 
-**docker-compose.dev.yml:**
-```yaml
-services:
-  orderflow-core:
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-    ports:
-      - "8080:8080"
-```
+3. **Use environment variables for configuration**
+   - 🚫 No hardcoded values in code
+   - ⚙️ Easy to change per environment
 
-**docker-compose.prod.yml:**
-```yaml
-services:
-  orderflow-core:
-    image: myregistry.azurecr.io/orderflow-core:latest
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-    restart: always
-```
+4. **Always use health checks for dependencies**
+   - 🛡️ Prevents startup errors
+   - ✅ Ensures services are ready
 
-**Usage:**
-```bash
-# Development
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+5. **Use named volumes for data persistence**
+   - 📦 Easy to manage
+   - 💾 Survives container restarts
 
-# Production
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
-```
+### ❌ Don't
 
----
+1. **Don't use `docker-compose down -v` unless you want to delete data**
 
-### Scenario 2: Scaling Services
+2. **Don't hardcode IPs in configuration**
+   ```yaml
+   RabbitMq__HostName: 172.18.0.2  # Bad!
+   ```
 
-**Horizontal Scaling:**
-```bash
-docker-compose up -d --scale orderflow-core=3
-```
+3. **Don't skip health checks**
+   ```yaml
+   depends_on:
+     - rabbitmq  # Unsafe!
+   ```
 
-**Result:**
-```
-orderflow-core_1
-orderflow-core_2
-orderflow-core_3
-```
+4. **Don't commit sensitive credentials**
+   - 🔐 Use environment variables
+   - 🔑 Use secrets management
 
-**With Load Balancer:**
-```yaml
-services:
-  nginx:
-    image: nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-    depends_on:
-      - orderflow-core
-
-  orderflow-core:
-    # No direct port exposure (nginx handles it)
-```
+5. **Don't expose unnecessary ports**
+   ```yaml
+   ports:
+     - "5432:5432"  # Only if needed externally
+   ```
 
 ---
 
-### Scenario 3: External Secrets
+## 📖 Quick Reference
 
-**Using Docker Secrets (Swarm):**
-```yaml
-services:
-  rabbitmq:
-    environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rabbitmq_pass
-    secrets:
-      - rabbitmq_pass
+### 🎯 When to Use Each File
 
-secrets:
-  rabbitmq_pass:
-    external: true
-```
+| Scenario | File | Command |
+|----------|------|---------|
+| 💻 Daily development | `docker-compose.dev.yml` | `docker-compose -f docker-compose.dev.yml up -d` |
+| 🧪 Integration testing | `docker-compose.yml` | `docker-compose up -d` |
+| 🎪 Demo/presentation | `docker-compose.yml` | `docker-compose up -d` |
 
-**Using Azure Key Vault (via environment):**
-```bash
-# Fetch from Key Vault
-RABBITMQ_PASS=$(az keyvault secret show --vault-name mykeyvault --name rabbitmq-pass --query value -o tsv)
+### ⚙️ Configuration Cheat Sheet
 
-# Export for docker-compose
-export RABBITMQ_PASS
+| Environment | HostName | Why |
+|-------------|----------|-----|
+| 💻 Visual Studio (dev) | `localhost` | App runs on host machine |
+| 🐳 Docker (full stack) | `rabbitmq` | App runs in container |
+| 🌐 Production | Service name or FQDN | Varies by platform |
 
-# Use in docker-compose.yml
-environment:
-  - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
-```
+### 🌐 Access Points
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| 🚀 API | http://localhost:8080 | None |
+| 📖 Swagger | http://localhost:8080/swagger | None |
+| 🐰 RabbitMQ UI | http://localhost:15672 | admin/admin123 |
 
 ---
 
-### Scenario 4: CI/CD Integration
+## 📝 Summary
 
-**GitHub Actions Example:**
-```yaml
-name: Deploy with Docker Compose
+### 🎯 Key Takeaways
 
-on:
-  push:
-    branches: [main]
+1. **Two Setup Options**:
+   - 💻 `docker-compose.dev.yml`: RabbitMQ only (best for development)
+   - 🚀 `docker-compose.yml`: Full stack (best for testing)
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Build application
-        run: dotnet publish -c Release -o ./publish
-      
-      - name: Deploy with Docker Compose
-        run: |
-          docker-compose build
-          docker-compose up -d
-      
-      - name: Health check
-        run: |
-          sleep 10
-          curl http://localhost:8080/health
-```
+2. **Health Checks Are Critical**:
+   - ✅ Ensure services are ready before connections
+   - 🛡️ Prevent startup failures
+
+3. **Named Volumes Preserve Data**:
+   - 💾 Data survives container restarts
+   - 📦 Easy to backup and restore
+
+4. **Service Names for DNS**:
+   - 🏷️ Use service names in Docker networks
+   - 💻 Use `localhost` when app runs outside Docker
+
+5. **Environment Variables for Configuration**:
+   - 🚫 No code changes needed
+   - ⚙️ Easy to adapt to different environments
 
 ---
 
-## Summary
+## 🔗 Resources
 
-This `docker-compose.yml` demonstrates **production-ready** container orchestration:
-
-? **Service Dependencies** � RabbitMQ starts before the app  
-? **Health Checks** � Ensures services are ready  
-? **Network Isolation** � Secure internal communication  
-? **Data Persistence** � Volumes prevent data loss  
-? **Environment Configuration** � Easy customization  
-? **Restart Policies** � Automatic recovery  
-? **Logging & Monitoring** � Easy access to logs  
-
-### Key Takeaways
-
-1. **Health checks are critical** � Don't just wait for container start
-2. **Use named volumes** � Easier to manage than anonymous volumes
-3. **Custom networks** � Enable DNS resolution and isolation
-4. **Environment variables** � Configuration without code changes
-5. **Depends_on + health checks** � Ensure proper startup order
-6. **Restart policies** � Build resilient systems
-
----
-
-## Resources
-
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Dockerfile Best Practices](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/)
-- [Docker Networking Guide](https://docs.docker.com/network/)
-- [Docker Volumes Guide](https://docs.docker.com/storage/volumes/)
-- [Health Check Reference](https://docs.docker.com/engine/reference/builder/#healthcheck)
+- 📘 [Docker Compose Documentation](https://docs.docker.com/compose/)
+- 🐰 [RabbitMQ Docker Hub](https://hub.docker.com/_/rabbitmq)
+- 🚀 [ASP.NET Core Docker Documentation](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/docker/)
+- 🌐 [Docker Networking](https://docs.docker.com/network/)
+- 💾 [Docker Volumes](https://docs.docker.com/storage/volumes/)
 
 ---
 
 <div align="center">
 
-**Built with Docker Compose, RabbitMQ, and .NET 8** ??
+**🐳 OrderFlow.Core - Containerized with Docker**
 
-*"Containers are not just about packaging�they're about building systems that can scale, heal, and evolve."*
+*Simple. Scalable. Ready for Development and Production.*
+
+✨ Built with .NET 8 | 🐰 RabbitMQ | 🐳 Docker
 
 </div>

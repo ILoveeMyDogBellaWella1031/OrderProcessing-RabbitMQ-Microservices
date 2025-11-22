@@ -83,6 +83,7 @@ This project is designed for **software engineers, architects, and students** wh
 5. [How the Pub/Sub Pattern Works](#how-the-pubsub-pattern-works-in-this-project)
    - [Overview](#overview)
    - [Key Components](#key-components)
+   - [Background Subscriber Service Lifecycle](#7-background-subscriber-service-lifecycle)
    - [Message Flow Example](#message-flow-example)
    - [Topic Exchange Routing](#topic-exchange-routing)
    - [Dependency Injection Setup](#dependency-injection-setup)
@@ -344,6 +345,111 @@ Multiple subscribers listen for specific event types and process them independen
 - **Purpose**: Sends customer notifications for any order event
 - **Actions**: Sends emails, SMS, push notifications based on event type
 - **Triggered by**: ALL order endpoints (creates notifications for every event)
+
+#### 7. Background Subscriber Service Lifecycle
+
+Understanding how subscribers come to life and start processing messages is crucial to grasping the event-driven architecture. Here's the complete instantiation and execution flow:
+
+**Instantiation Flow (Happens Once at Application Startup)**
+
+```
+1. ✅ Constructor Invoked
+   └─> Dependency Injection container creates subscriber instance
+   └─> Injects: IRabbitMqConnectionFactory, RabbitMqSettings, ILogger
+   └─> Base class constructor called immediately
+
+2. ✅ Configuration Loaded
+   └─> Reads subscriber-specific config from appsettings.json
+   └─> Example: "Notification" → QueueName, RoutingKey
+   └─> Validates configuration (throws exception if missing)
+
+3. ✅ Registered as Hosted Service
+   └─> AddHostedService<T>() in Program.cs registers subscriber
+   └─> .NET Host manages lifecycle (start, stop, dispose)
+   └─> All subscribers run in parallel as background tasks
+```
+
+**Execution Flow (Continuous Background Processing)**
+
+```
+4. ✅ Application Starts
+   └─> .NET Host calls ExecuteAsync() automatically
+   └─> Subscriber transitions from "Created" → "Running" state
+   └─> No HTTP request needed—runs independently
+
+5. ✅ RabbitMQ Connection Established
+   └─> IRabbitMqConnectionFactory.CreateConnection()
+   └─> Retry logic with exponential backoff (up to 5 attempts)
+   └─> Connection settings: AutomaticRecoveryEnabled = true
+
+6. ✅ Infrastructure Declared
+   └─> Exchange declared (order_exchange, type: topic, durable: true)
+   └─> Queue declared (e.g., notification_queue, durable: true)
+   └─> QoS configured (prefetchCount: 1 - process one message at a time)
+
+7. ✅ Queue Binding Configured
+   └─> Binds queue to exchange with routing key pattern
+   └─> Example: notification_queue ← "order.*" pattern
+   └─> RabbitMQ now knows where to route matching messages
+
+8. ✅ Consumer Starts Listening
+   └─> EventingBasicConsumer attached to channel
+   └─> Subscribes to message delivery events
+   └─> Manual acknowledgment mode (autoAck: false)
+
+9. ✅ Ready State - Infinite Loop
+   └─> while (!stoppingToken.IsCancellationRequested)
+   └─> Waits for incoming messages (event-driven, non-blocking)
+   └─> CPU usage near 0% when idle—no polling overhead
+
+10. ✅ Message Processing (Per Message)
+    └─> OnMessageReceived event fires automatically
+    └─> Decodes UTF-8 message body → JSON string
+    └─> Deserializes JSON → OrderEvent object
+    └─> Calls ProcessMessageAsync() (derived class implementation)
+    └─> On Success: BasicAck (remove from queue)
+    └─> On Error: BasicNack with requeue=true (retry later)
+
+11. ✅ Graceful Shutdown (On Application Stop)
+    └─> CancellationToken triggered
+    └─> Stops consuming new messages
+    └─> Completes current message processing
+    └─> Closes channel and connection
+    └─> Disposes resources (Dispose pattern)
+```
+
+**Key Characteristics**
+
+- **Zero Configuration Per Message**: Once started, subscribers process messages automatically—no manual intervention required
+- **Parallel Execution**: All subscribers run simultaneously in separate background tasks
+- **Event-Driven**: No polling loops—RabbitMQ pushes messages when they arrive
+- **Resilient**: Automatic connection recovery handles network failures transparently
+- **Isolated**: Each subscriber has its own queue, channel, and processing logic
+- **Testable**: Base class handles infrastructure; derived classes focus on business logic
+- **Graceful Degradation**: Failed messages requeue automatically for retry
+
+**Example: NotificationSubscriber Instantiation**
+
+```csharp
+// Program.cs - Registration
+builder.Services.AddHostedService<NotificationSubscriber>();
+
+// Runtime Flow:
+1. App starts → DI creates NotificationSubscriber instance
+2. Constructor loads "Notification" config from appsettings.json
+3. .NET Host calls ExecuteAsync() automatically
+4. Subscriber connects to RabbitMQ, declares queue, binds routing key "order.*"
+5. Starts listening for messages matching "order.*" pattern
+6. When POST /api/orders occurs:
+   - Publisher sends message with routing key "order.created"
+   - RabbitMQ routes to notification_queue (matches "order.*")
+   - NotificationSubscriber receives message automatically
+   - ProcessMessageAsync() executes notification logic
+   - Message acknowledged, removed from queue
+7. Subscriber continues waiting for next message (infinite loop)
+```
+
+This architecture ensures subscribers are **always ready** to process messages the moment they arrive, without requiring manual polling or explicit invocation. The .NET `BackgroundService` abstraction combined with RabbitMQ's event-driven model creates a robust, scalable, and maintainable message processing pipeline.
 
 ### Message Flow Example
 
@@ -623,7 +729,7 @@ OrderFlow.Core/
 - ✅ **API Documentation** — Interactive Swagger UI
 - ✅ **Generic Response Pattern** — Consistent `ApiResponse<T>` wrapper for all endpoints
 - ✅ **Type-Safe Mapping** — Generic mapping extensions for domain models to DTOs
-- ✅ **Comprehensive Documentation** — Multiple guides covering patterns, deployment, and testing
+- ✅ **Comprehensive Documentation** — Multiple guides covering all aspects
 - ✅ **Structured Logging** — Detailed logging for debugging and monitoring
 
 ## Monitoring
@@ -723,6 +829,20 @@ This project includes comprehensive documentation covering all aspects of the sy
   - Advanced scenarios and best practices
 
 ### 🎨 **Patterns & Architecture**
+- **[Options Pattern Guide](Docs/Patterns/OPTIONS-PATTERN.md)**
+  - Strongly-typed configuration binding
+  - IOptions<T> pattern implementation
+  - Configuration loading from appsettings.json
+  - Dependency injection integration
+  - Validation and best practices
+
+- **[Pub/Sub RabbitMQ Pattern Guide](Docs/Patterns/PUB-SUB-RABBITMQ-PATTERN.md)**
+  - Event-driven architecture overview
+  - Topic exchange routing patterns
+  - Publisher and subscriber implementation
+  - Message flow and routing examples
+  - Real-world usage scenarios
+
 - **[API Response Pattern Guide](Docs/Patterns/API-RESPONSE-PATTERN.md)**
   - Consistent response wrapper structure
   - Generic `ApiResponse<T>` implementation
@@ -759,6 +879,8 @@ This project includes comprehensive documentation covering all aspects of the sy
 | **Quick Start** | [Main README](README.md) | Getting started, architecture overview |
 | **Docker Deployment** | [DOCKER-DEPLOYMENT.md](Docs/Containerization/DOCKER-DEPLOYMENT.md) | Step-by-step deployment guide |
 | **Docker Architecture** | [DOCKER-CONTAINERIZE-README.md](Docs/Containerization/DOCKER-CONTAINERIZE-README.md) | Deep dive into docker-compose.yml |
+| **Options Pattern** | [OPTIONS-PATTERN.md](Docs/Patterns/OPTIONS-PATTERN.md) | Configuration binding with IOptions<T> |
+| **Pub/Sub Pattern** | [PUB-SUB-RABBITMQ-PATTERN.md](Docs/Patterns/PUB-SUB-RABBITMQ-PATTERN.md) | Event-driven architecture with RabbitMQ |
 | **API Patterns** | [API-RESPONSE-PATTERN.md](Docs/Patterns/API-RESPONSE-PATTERN.md) | API response design patterns |
 | **API Simplification** | [API-RESPONSE-SIMPLIFICATION.md](Docs/Patterns/API-RESPONSE-SIMPLIFICATION.md) | Response structure evolution guide |
 | **Generic Mapping** | [GENERIC-MAPPING-EXTENSIONS.md](Docs/Patterns/GENERIC-MAPPING-EXTENSIONS.md) | Type-safe domain to DTO mapping |
@@ -775,6 +897,7 @@ Consider adding:
 - ✅ **API Response Pattern**: ✓ Consistent response wrapper implemented
 - ✅ **Generic Mapping Extensions**: ✓ Type-safe domain model to DTO mapping
 - ✅ **Comprehensive Documentation**: ✓ Multiple guides covering all aspects
+- ✅ **Structured Logging**: ✓ Detailed logging for debugging and monitoring
 - **Database Persistence**: Store orders in a database (SQL Server, PostgreSQL)
 - **Dead Letter Queues**: Handle permanently failed messages
 - **Message Retry Policies**: Enhanced backoff strategies with dead letter exchange
@@ -798,6 +921,8 @@ Consider adding:
 ### Project Documentation
 - [Docker Deployment Guide](Docs/Containerization/DOCKER-DEPLOYMENT.md)
 - [Docker Containerization Deep Dive](Docs/Containerization/DOCKER-CONTAINERIZE-README.md)
+- [Options Pattern Guide](Docs/Patterns/OPTIONS-PATTERN.md)
+- [Pub/Sub RabbitMQ Pattern Guide](Docs/Patterns/PUB-SUB-RABBITMQ-PATTERN.md)
 - [API Response Pattern Guide](Docs/Patterns/API-RESPONSE-PATTERN.md)
 - [API Response Simplification Guide](Docs/Patterns/API-RESPONSE-SIMPLIFICATION.md)
 - [Generic Mapping Extensions Guide](Docs/Patterns/GENERIC-MAPPING-EXTENSIONS.md)
