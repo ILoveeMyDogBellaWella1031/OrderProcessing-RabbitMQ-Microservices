@@ -1,3 +1,4 @@
+using System.Text;
 using OrderFlow.Core.Configuration;
 using OrderFlow.Core.Infrastructure.RabbitMQ;
 using OrderFlow.Core.Services.Subscribers;
@@ -5,6 +6,9 @@ using HealthChecks.UI.Client;
 using HealthChecks.RabbitMQ; // Add this using directive
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+
+// Enable UTF-8 encoding for console output to display emojis/icons
+Console.OutputEncoding = Encoding.UTF8;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +19,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure RabbitMQ settings
+// Configure RabbitMQ settings. builder.Configuration.GetSection("RabbitMq") retrieves the RabbitMQ configuration section from all the configuration sources (appsettings.json, environment variables, etc.) and binds it to the RabbitMqSettings class.
 builder.Services.Configure<RabbitMqSettings>(
     builder.Configuration.GetSection("RabbitMq"));
 
@@ -36,6 +40,7 @@ builder.Services.AddHostedService<NotificationSubscriber>();
 var rabbitMqSettings = builder.Configuration.GetSection("RabbitMq").Get<RabbitMqSettings>();
 var rabbitConnectionString = $"amqp://{rabbitMqSettings.UserName}:{rabbitMqSettings.Password}@{rabbitMqSettings.HostName}:{rabbitMqSettings.Port}";
 
+// Configure Health Checks
 builder.Services.AddHealthChecks()
     .AddRabbitMQ(
         rabbitConnectionString: rabbitConnectionString,
@@ -56,6 +61,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+// Map health check endpoint to /health for services like Kubernetes or monitoring tools to check application health
 app.MapHealthChecks("/health", new HealthCheckOptions()
 {
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse

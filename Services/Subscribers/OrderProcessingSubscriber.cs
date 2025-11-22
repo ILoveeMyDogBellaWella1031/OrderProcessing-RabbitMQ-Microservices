@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using OrderFlow.Core.Configuration;
 using OrderFlow.Core.Infrastructure.RabbitMQ;
 using OrderFlow.Core.Models;
@@ -9,18 +9,19 @@ namespace OrderFlow.Core.Services.Subscribers;
 /// Subscriber that processes newly created order events.
 /// </summary>
 /// <remarks>
-/// This subscriber listens to order.created events and handles initial order processing logic.
-/// It simulates business logic that would typically include:
+/// This subscriber listens to order.created events (configured in appsettings.json)
+/// and handles initial order processing logic. It simulates business logic that would typically include:
 /// - Validating order details
 /// - Checking inventory availability
 /// - Calculating shipping costs
 /// - Initiating payment processing
-/// The subscriber runs as a background service and processes messages from the order_processing_queue.
+/// The subscriber runs as a background service and processes messages from the configured queue.
+/// 
+/// Configuration: RabbitMq:Subscribers:OrderProcessing in appsettings.json
 /// </remarks>
 public class OrderProcessingSubscriber : RabbitMqSubscriberBase
 {
-    protected override string QueueName => "order_processing_queue";
-    protected override string RoutingKey => "order.created";
+    protected override string ConfigurationKey => "OrderProcessing"; // Matches the configuration section for this subscriber
 
     public OrderProcessingSubscriber(
         IRabbitMqConnectionFactory connectionFactory,
@@ -29,18 +30,23 @@ public class OrderProcessingSubscriber : RabbitMqSubscriberBase
         : base(connectionFactory, settings, logger)
     {
     }
-
+    
     protected override async Task ProcessMessageAsync(OrderEvent orderEvent)
     {
-        Logger.LogInformation("Processing order: {OrderId}", orderEvent.OrderId);
+        _logger.LogInformation(
+            "[OrderProcessingSubscriber] 📨 Received order event for processing - OrderId: {OrderId}, EventType: {EventType}",
+            orderEvent.OrderId,
+            orderEvent.EventType);
+
+        // Simulate order processing logic (e.g., validation, inventory check, payment initiation)
+        await Task.Delay(1000);
         
-        // Simulate order processing logic
-        await Task.Delay(1000); // Simulate some work
-        
-        Logger.LogInformation(
-            "Order {OrderId} processed successfully. Customer: {CustomerName}, Product: {ProductName}",
+        _logger.LogInformation(
+            "[OrderProcessingSubscriber] ✅ Successfully processed order - OrderId: {OrderId}, Customer: {CustomerName}, Product: {ProductName}, Quantity: {Quantity}, Total: {TotalAmount:C}",
             orderEvent.OrderId,
             orderEvent.OrderData?.CustomerName,
-            orderEvent.OrderData?.ProductName);
+            orderEvent.OrderData?.ProductName,
+            orderEvent.OrderData?.Quantity,
+            orderEvent.OrderData?.TotalAmount);
     }
 }
