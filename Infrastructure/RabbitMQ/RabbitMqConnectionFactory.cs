@@ -7,7 +7,11 @@ using System.Net.Sockets;
 namespace OrderFlow.Core.Infrastructure.RabbitMQ;
 
 /// <summary>
-/// Concrete implementation of <see cref="IRabbitMqConnectionFactory"/> for creating RabbitMQ connections.
+/// Concrete implementation of <see cref="IRabbitMqConnectionFactory"/> for creating RabbitMQ connections. 
+/// Connection factory is used to establish connections to the RabbitMQ server based on provided settings.
+/// - Implements automatic recovery and network recovery to handle connection interruptions.
+/// - Logs all connection attempts and errors for monitoring and debugging purposes.
+/// - Retries connection attempts with exponential backoff in case of failures.
 /// </summary>
 /// <remarks>
 /// This factory creates RabbitMQ connections using the configuration settings provided through
