@@ -6,24 +6,27 @@ namespace OrderFlow.Core.Configuration;
 /// <remarks>
 /// This class contains all the necessary configuration parameters to establish a connection
 /// to RabbitMQ and configure the exchange for message publishing and subscribing.
-/// Default values are provided for local development environment.
-/// These settings are typically bound from appsettings.json configuration file.
+/// These settings are bound from appsettings.json configuration file.
 /// </remarks>
 public class RabbitMqSettings
 {
-    public string HostName { get; set; } = "localhost";
-    public int Port { get; set; } = 5672;
-    public string UserName { get; set; } = "guest";
-    public string Password { get; set; } = "guest";
+    public string HostName { get; set; } = null!;
+    public int Port { get; set; }
+    public string UserName { get; set; } = null!;
+    public string Password { get; set; } = null!;
+    
     /// <summary>
-    /// Gets or sets the name of the exchange to which orders are published. Exchange in RabbitMQ is a message routing mechanism that determines how messages are directed to queues based on routing keys.
+    /// Gets or sets the name of the exchange to which orders are published.
     /// </summary>
-    public string ExchangeName { get; set; } = "order_exchange";
+    public string ExchangeName { get; set; } = null!;
+    
     /// <summary>
-    /// Gets or sets the type of exchange to use for message routing.
+    /// Gets or sets the type of exchange to use for message routing (e.g., "topic", "direct", "fanout").
     /// </summary>
-    /// <remarks>Common exchange types include "direct", "fanout", "topic", and "headers". The exchange type
-    /// determines how messages are routed to queues. Ensure that the specified exchange type is supported by the
-    /// messaging broker in use.</remarks>
-    public string ExchangeType { get; set; } = "topic";
+    public string ExchangeType { get; set; } = null!;
+    
+    /// <summary>
+    /// Gets or sets the subscriber-specific configuration including queue names and routing keys.
+    /// </summary>
+    public SubscriberSettings Subscribers { get; set; } = null!;
 }
