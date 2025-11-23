@@ -26,6 +26,178 @@
 
 > *"The art of programming is the art of organizing complexity."* — **Edsger W. Dijkstra**
 
+---
+
+## 🚀 How to Contribute to This Project
+
+**Want to help make this project even better?** Contributions are not just welcome—they're encouraged! Whether you're fixing a bug, adding a feature, improving documentation, or implementing one of the [Next Steps](#next-steps), your contribution matters.
+
+### 🎯 Quick Contribution Guide
+
+**1. Explore What Needs Doing**
+- Review the [Next Steps](#next-steps) section for features waiting to be implemented
+- Check open issues on GitHub for bugs and enhancement requests
+- Identify areas for improvement (performance, documentation, testing, etc.)
+
+**2. Pick Your Task**
+Choose something that excites you:
+- ✅ Implement **Database Persistence** (SQL Server, PostgreSQL, or MongoDB)
+- ✅ Add **Dead Letter Queues** for failed message handling
+- ✅ Build **Unit and Integration Tests** for subscribers and publishers
+- ✅ Enhance **API Authentication** with JWT or OAuth2
+- ✅ Add **Circuit Breaker Pattern** using Polly library
+- ✅ Implement **Idempotency** for duplicate message handling
+- ✅ Create **Metrics and Observability** with Prometheus/Grafana
+- ✅ Improve documentation or add new guides
+
+**3. Follow Best Practices for Pull Requests**
+
+**Before You Start:**
+```bash
+# Fork the repository on GitHub
+# Clone your fork locally
+git clone https://github.com/YOUR_USERNAME/OrderProcessing-RabbitMQ-Microservices.git
+cd OrderProcessing-RabbitMQ-Microservices
+
+# Add upstream remote
+git remote add upstream https://github.com/dariemcarlosdev/OrderProcessing-RabbitMQ-Microservices.git
+
+# Create a feature branch (use descriptive names)
+git checkout -b feature/database-persistence
+# or
+git checkout -b fix/rabbitmq-connection-timeout
+# or
+git checkout -b docs/add-testing-examples
+```
+
+**Development Workflow:**
+```bash
+# Keep your branch up to date
+git fetch upstream
+git rebase upstream/master
+
+# Make your changes (follow existing code style)
+# Test thoroughly (run the application, test all scenarios)
+dotnet build
+dotnet test  # If tests exist
+
+# Commit with clear, descriptive messages
+git add .
+git commit -m "feat: add PostgreSQL persistence for Order entity
+
+- Implement OrderRepository with CRUD operations
+- Add Entity Framework Core configuration
+- Update appsettings.json with connection string
+- Add database migration scripts
+- Update documentation with setup instructions"
+
+# Push to your fork
+git push origin feature/database-persistence
+```
+
+**4. Create a Stellar Pull Request**
+
+**PR Title Format:**
+- `feat: add database persistence with PostgreSQL`
+- `fix: resolve RabbitMQ connection timeout on startup`
+- `docs: add comprehensive testing guide`
+- `refactor: simplify API response mapping logic`
+- `test: add integration tests for subscribers`
+
+**PR Description Template:**
+```markdown
+## 📋 Summary
+Brief description of what this PR does and why it's needed.
+
+## 🎯 Changes Made
+- Added PostgreSQL database persistence for Order entity
+- Implemented OrderRepository with async CRUD operations
+- Added EF Core migrations and seeding
+- Updated Docker Compose with PostgreSQL service
+- Added connection string configuration
+
+## 🧪 Testing Performed
+- ✅ Tested order creation and retrieval from database
+- ✅ Verified database connection in Docker environment
+- ✅ Ran all existing integration tests (all passing)
+- ✅ Tested migration scripts on clean database
+
+## 📚 Documentation Updates
+- Updated README.md with database setup instructions
+- Added new guide: Docs/Persistence/DATABASE-SETUP.md
+- Updated docker-compose.yml comments
+
+## 🔗 Related Issues
+Closes #42
+Related to #38
+
+## 📸 Screenshots (if applicable)
+[Include screenshots of new features, UI changes, or test results]
+
+## ✅ Checklist
+- [x] Code follows project style and conventions
+- [x] All tests pass
+- [x] Documentation updated
+- [x] Docker Compose configuration tested
+- [x] No breaking changes (or clearly documented)
+- [x] Commit messages are clear and descriptive
+```
+
+**5. Request Review**
+- Tag relevant maintainers or contributors
+- Be responsive to feedback and suggestions
+- Make requested changes promptly
+- Engage in constructive discussion
+
+**6. Celebrate! 🎉**
+Once your PR is merged, you've officially contributed to OrderFlow.Core!
+
+### 📖 Contribution Standards
+
+**Code Quality:**
+- Follow existing code style and conventions (Clean Architecture, SOLID principles)
+- Write self-documenting code with clear naming
+- Add XML documentation comments for public APIs
+- Keep methods small and focused (Single Responsibility)
+
+**Testing:**
+- Add unit tests for new business logic
+- Add integration tests for new subscribers or publishers
+- Ensure all existing tests still pass
+- Document test scenarios
+
+**Documentation:**
+- Update README.md if adding new features
+- Create new documentation files in `Docs/` if needed
+- Add code comments for complex logic
+- Update API documentation in Swagger
+
+**Commit Messages:**
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` new features
+- `fix:` bug fixes
+- `docs:` documentation changes
+- `refactor:` code refactoring
+- `test:` adding or updating tests
+- `chore:` maintenance tasks
+
+### 🤝 Need Help?
+
+- 💬 Open a GitHub issue to discuss your idea before starting
+- 📧 Reach out if you're stuck or need guidance
+- 🌟 Star the repository to show support
+- 📢 Share the project with others who might benefit
+
+### 🏆 Recognition
+
+All contributors will be recognized in the project. Your name will be added to a Contributors section, and your efforts will be celebrated!
+
+---
+
+**Ready to contribute? Pick a task from [Next Steps](#next-steps) and let's build something amazing together!** 🚀
+
+---
+
 ## 🎯 Project Vision
 
 **OrderFlow.Core** is a comprehensive demonstration of **event-driven architecture** and **microservices patterns** using .NET 8 and RabbitMQ. This project serves as both a learning resource and a production-ready reference implementation for building scalable, resilient, and maintainable distributed systems.
@@ -891,23 +1063,23 @@ This project includes comprehensive documentation covering all aspects of the sy
 ## Next Steps
 
 Consider adding:
-- ✅ **Connection Resilience**: ✓ Implemented with retry logic and exponential backoff
-- ✅ **Health Checks**: ✓ Implemented with ASP.NET Core health checks
-- ✅ **Docker Support**: ✓ Full Docker Compose orchestration
-- ✅ **API Response Pattern**: ✓ Consistent response wrapper implemented
-- ✅ **Generic Mapping Extensions**: ✓ Type-safe domain model to DTO mapping
-- ✅ **Comprehensive Documentation**: ✓ Multiple guides covering all aspects
-- ✅ **Structured Logging**: ✓ Detailed logging for debugging and monitoring
-- **Database Persistence**: Store orders in a database (SQL Server, PostgreSQL)
-- **Dead Letter Queues**: Handle permanently failed messages
-- **Message Retry Policies**: Enhanced backoff strategies with dead letter exchange
-- **Circuit Breaker Pattern**: Prevent cascading failures (Polly library)
-- **Unit and Integration Tests**: Test publishers and subscribers
-- **Metrics and Observability**: Prometheus, Grafana, or Application Insights
-- **API Authentication**: Add JWT or OAuth2 authentication
-- **Rate Limiting**: Protect API endpoints from abuse
-- **Idempotency**: Handle duplicate message processing
-- **Event Sourcing**: Full event history and replay capability
+- [x] **Connection Resilience**: ✓ Implemented with retry logic and exponential backoff
+- [x] **Health Checks**: ✓ Implemented with ASP.NET Core health checks
+- [x] **Docker Support**: ✓ Full Docker Compose orchestration
+- [x] **API Response Pattern**: ✓ Consistent response wrapper implemented
+- [x] **Generic Mapping Extensions**: ✓ Type-safe domain model to DTO mapping
+- [x] **Comprehensive Documentation**: ✓ Multiple guides covering all aspects
+- [x] **Structured Logging**: ✓ Detailed logging for debugging and monitoring
+- [ ] **Database Persistence**: Store orders in a database (SQL Server, PostgreSQL)
+- [ ] **Dead Letter Queues**: Handle permanently failed messages
+- [ ] **Message Retry Policies**: Enhanced backoff strategies with dead letter exchange
+- [ ] **Circuit Breaker Pattern**: Prevent cascading failures (Polly library)
+- [ ] **Unit and Integration Tests**: Test publishers and subscribers
+- [ ] **Metrics and Observability**: Prometheus, Grafana, or Application Insights
+- [ ] **API Authentication**: Add JWT or OAuth2 authentication
+- [ ] **Rate Limiting**: Protect API endpoints from abuse
+- [ ] **Idempotency**: Handle duplicate message processing
+- [ ] **Event Sourcing**: Full event history and replay capability
 
 ## Resources
 
