@@ -41,14 +41,18 @@
 
 **2. Pick Your Task**
 Choose something that excites you:
-- ✅ Implement **Database Persistence** (SQL Server, PostgreSQL, or MongoDB)
-- ✅ Add **Dead Letter Queues** for failed message handling
-- ✅ Build **Unit and Integration Tests** for subscribers and publishers
-- ✅ Enhance **API Authentication** with JWT or OAuth2
-- ✅ Add **Circuit Breaker Pattern** using Polly library
-- ✅ Implement **Idempotency** for duplicate message handling
-- ✅ Create **Metrics and Observability** with Prometheus/Grafana
-- ✅ Improve documentation or add new guides
+
+- [ ] Implement **Database Persistence**: Store orders in a database (SQL Server, PostgreSQL)
+- [ ] Add **Dead Letter Queues**: Handle permanently failed messages
+- [ ] Add **Message Retry Policies**: Enhanced backoff strategies with dead letter exchange
+- [ ] Add **Circuit Breaker Pattern**: Prevent cascading failures (Polly library)
+- [ ] Build **Unit and Integration Tests**: Test publishers and subscribers
+- [ ] Create **Metrics and Observability**: Prometheus, Grafana, or Application Insights
+- [ ] Enhance **API Authentication**: Add JWT or OAuth2 authentication
+- [ ] Implement **Rate Limiting**: Protect API endpoints from abuse
+- [ ] Implement **Idempotency**: Handle duplicate message processing
+- [ ] Implement **Event Sourcing**: Full event history and replay capability
+- [ ] Improve documentation or add new guidesImprove **Documentation**: Add new guides, diagrams, or examples
 
 **3. Follow Best Practices for Pull Requests**
 
